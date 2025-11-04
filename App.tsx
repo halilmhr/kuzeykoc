@@ -1,5 +1,5 @@
 
-import React, { useState, createContext, useMemo, useCallback } from 'react';
+import React, { useState, createContext, useMemo, useCallback, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import CoachDashboard from './pages/CoachDashboard';
@@ -19,12 +19,30 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for saved user session on app start
+  useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser) as User;
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+        localStorage.removeItem('currentUser');
+      }
+    }
+    setIsLoading(false);
+  }, []);
 
   const login = useCallback(async (email: string, password: string, role: UserRole): Promise<User | null> => {
     try {
       const foundUser = await supabaseApi.authenticateUser(email, password, role);
       if (foundUser) {
         setUser(foundUser);
+        // Save user to localStorage
+        localStorage.setItem('currentUser', JSON.stringify(foundUser));
         return foundUser;
       }
       return null;
@@ -36,9 +54,20 @@ const App: React.FC = () => {
 
   const logout = useCallback(() => {
     setUser(null);
+    // Remove user from localStorage
+    localStorage.removeItem('currentUser');
   }, []);
 
   const authContextValue = useMemo(() => ({ user, login, logout }), [user, login, logout]);
+
+  // Show loading spinner while checking for saved session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
       <AuthContext.Provider value={authContextValue}>
