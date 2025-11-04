@@ -7,6 +7,29 @@ export class NotificationService {
       try {
         this.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js');
         console.log('✅ Service Worker başarıyla kaydedildi');
+        
+        // Register background sync (with type assertion)
+        try {
+          if ('sync' in (this.serviceWorkerRegistration as any)) {
+            await (this.serviceWorkerRegistration as any).sync.register('check-notifications');
+            console.log('🔄 Background sync registered');
+          }
+        } catch (error) {
+          console.log('⚠️ Background sync not available:', error);
+        }
+        
+        // Register periodic background sync (Chrome only)
+        try {
+          if ('periodicSync' in (this.serviceWorkerRegistration as any)) {
+            await (this.serviceWorkerRegistration as any).periodicSync.register('check-notifications-periodic', {
+              minInterval: 60000 // 1 minute minimum
+            });
+            console.log('⏰ Periodic background sync registered');
+          }
+        } catch (error) {
+          console.log('⚠️ Periodic sync not available:', error);
+        }
+        
       } catch (error) {
         console.error('❌ Service Worker kaydedilemedi:', error);
       }
@@ -56,11 +79,12 @@ export class NotificationService {
           tag: options.tag || 'coach-notification',
           requireInteraction: true, // Android'de bildirim ekranında kalır
           silent: false,
-          vibrate: [300, 200, 300],
+          ...(('vibrate' in navigator) && { vibrate: [300, 200, 300] }),
           data: {
             url: '/', // Tıklandığında ana sayfaya git
             ...options.data
-          },
+          }
+        } as any & {
           actions: [
             {
               action: 'open',

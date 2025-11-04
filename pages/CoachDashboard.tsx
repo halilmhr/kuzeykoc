@@ -202,11 +202,31 @@ const CoachDashboard: React.FC = () => {
     // İlk kontrol
     checkForNewNotifications();
     
-    // Her 3 saniyede bir kontrol et
-    const notificationInterval = setInterval(checkForNewNotifications, 3000);
+    // Her 5 saniyede bir kontrol et (daha az kaynak tüketimi)
+    const notificationInterval = setInterval(checkForNewNotifications, 5000);
+    
+    // Page Visibility API - Tab'ı geri getirdiğinde hemen kontrol et
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('📱 Tab aktif oldu, bildirimleri kontrol ediliyor...');
+        checkForNewNotifications();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Online/Offline durumunu takip et
+    const handleOnline = () => {
+      console.log('🌐 İnternet bağlantısı geri geldi, bildirimleri kontrol ediliyor...');
+      checkForNewNotifications();
+    };
+    
+    window.addEventListener('online', handleOnline);
     
     return () => {
       clearInterval(notificationInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
     };
   }, [auth?.user, notifications]);
 
@@ -215,6 +235,18 @@ const CoachDashboard: React.FC = () => {
     if (auth?.user && auth.user.role === 'coach') {
       NotificationService.initialize().then(() => {
         console.log('🔔 Koç için bildirim sistemi hazır');
+        
+        // Store coach data for background sync
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'STORE_COACH_DATA',
+            coach: {
+              id: auth.user.id,
+              fullName: auth.user.fullName,
+              email: auth.user.email
+            }
+          });
+        }
       });
     }
   }, [auth?.user]);
