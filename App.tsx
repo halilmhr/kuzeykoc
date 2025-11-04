@@ -8,6 +8,7 @@ import StudentDetailPage from './pages/StudentDetailPage';
 import { User, UserRole } from './types';
 import supabaseApi from './services/supabaseApi';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { NotificationService } from './services/notificationService';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +29,19 @@ const App: React.FC = () => {
       try {
         const parsedUser = JSON.parse(savedUser) as User;
         setUser(parsedUser);
+        
+        // Request notification permission if user is a coach
+        if (parsedUser.role === UserRole.COACH) {
+          setTimeout(() => {
+            NotificationService.requestPermission().then(granted => {
+              if (granted) {
+                console.log('✅ Bildirim izni verildi');
+              } else {
+                console.log('❌ Bildirim izni reddedildi');
+              }
+            });
+          }, 2000); // 2 saniye bekle
+        }
       } catch (error) {
         console.error('Error parsing saved user:', error);
         localStorage.removeItem('currentUser');
@@ -43,6 +57,18 @@ const App: React.FC = () => {
         setUser(foundUser);
         // Save user to localStorage
         localStorage.setItem('currentUser', JSON.stringify(foundUser));
+        
+        // Request notification permission if user is a coach
+        if (foundUser.role === UserRole.COACH) {
+          setTimeout(() => {
+            NotificationService.requestPermission().then(granted => {
+              if (granted) {
+                console.log('✅ Bildirim izni verildi');
+              }
+            });
+          }, 1000);
+        }
+        
         return foundUser;
       }
       return null;

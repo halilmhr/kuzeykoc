@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { User, Student, Coach, Assignment, DailyLog, TrialExamResult, Book, UserRole } from '../types';
 import { hashPassword, verifyPassword } from '../utils/passwordUtils';
+import { NotificationService } from './notificationService';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -349,6 +350,9 @@ export async function addDailyLog(logData: Omit<DailyLog, 'id'>): Promise<DailyL
         return null;
     }
 
+    let result: DailyLog;
+    let isNewEntry = false;
+
     if (existingLog) {
         // Update existing log by adding question counts
         const newQuestionCount = existingLog.question_count + logData.questionCount;
@@ -365,7 +369,7 @@ export async function addDailyLog(logData: Omit<DailyLog, 'id'>): Promise<DailyL
             return null;
         }
 
-        return {
+        result = {
             id: updatedData.id,
             studentId: updatedData.student_id,
             subject: updatedData.subject,
@@ -390,14 +394,33 @@ export async function addDailyLog(logData: Omit<DailyLog, 'id'>): Promise<DailyL
             return null;
         }
 
-        return {
+        result = {
             id: data.id,
             studentId: data.student_id,
             subject: data.subject,
             questionCount: data.question_count,
             date: data.date
         } as DailyLog;
+        isNewEntry = true;
     }
+
+    // Send browser notification
+    try {
+        const student = await getStudentById(logData.studentId);
+        if (student) {
+            // Bildirim gönder (sadece yeni giriş ise veya soru sayısı artmışsa)
+            NotificationService.notifyDailyLog(
+                student.fullName,
+                logData.subject,
+                logData.questionCount
+            );
+        }
+    } catch (notificationError) {
+        console.error('Error sending notification:', notificationError);
+        // Don't fail the main operation if notification fails
+    }
+
+    return result;
 }
 
 // Trial Exams
@@ -473,8 +496,7 @@ export async function addTrialExam(examData: Omit<TrialExamResult, 'id'>): Promi
         }
     }
     
-    // Map database fields to TypeScript interface
-    return {
+    const result = {
         id: examRecord.id,
         studentId: examRecord.student_id,
         examName: examRecord.exam_name,
@@ -484,6 +506,22 @@ export async function addTrialExam(examData: Omit<TrialExamResult, 'id'>): Promi
         totalBlank: examRecord.total_blank,
         details: examData.details || []
     } as TrialExamResult;
+
+    // Send browser notification
+    try {
+        const student = await getStudentById(examData.studentId);
+        if (student) {
+            NotificationService.notifyTrialExam(
+                student.fullName,
+                examData.examName,
+                examData.totalCorrect
+            );
+        }
+    } catch (notificationError) {
+        console.error('Error sending trial exam notification:', notificationError);
+    }
+
+    return result;
 }
 
 // Books
@@ -694,8 +732,7 @@ export const updateHomework = async (id: string, updates: {
         throw error;
     }
 
-    // Map database fields to frontend interface
-    return {
+    const result = {
         id: data.id,
         title: data.title,
         description: data.description,
@@ -705,6 +742,23 @@ export const updateHomework = async (id: string, updates: {
         isCompleted: data.is_completed,
         createdAt: data.created_at
     };
+
+    // Send notification if homework was completed
+    if (updates.isCompleted === true) {
+        try {
+            const student = await getStudentById(data.student_id);
+            if (student) {
+                NotificationService.notifyHomeworkCompleted(
+                    student.fullName,
+                    data.title
+                );
+            }
+        } catch (notificationError) {
+            console.error('Error sending homework completion notification:', notificationError);
+        }
+    }
+
+    return result;
 };
 
 export const deleteHomework = async (id: string) => {
