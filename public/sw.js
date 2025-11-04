@@ -79,7 +79,7 @@ async function checkForNewNotifications() {
         tag: 'coach-notification-' + notification.id,
         requireInteraction: true,
         silent: true,
-        vibrate: [400, 200, 400, 200, 400],
+        // vibrate kaldırıldı - silent ile çakışıyor
         data: {
           url: '/coach',
           notificationId: notification.id,
@@ -145,8 +145,7 @@ self.addEventListener('message', function(event) {
       badge: '/favicon.ico',
       tag: tag || 'coach-notification',
       requireInteraction: true,
-      silent: true, // Ses kapalı
-      vibrate: [300, 200, 300, 200, 300],
+      silent: true, // Ses kapalı - vibrate kaldırıldı
       data: {
         url: '/coach',
         timestamp: Date.now()
