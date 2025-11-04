@@ -440,55 +440,84 @@ const CoachDashboard: React.FC = () => {
   };
 
   const handleCheckNotificationPermission = async () => {
-    console.log('🔐 Notification izinleri kontrol ediliyor...');
-    
-    // Notification API desteği
-    const supported = 'Notification' in window;
-    console.log('📱 Notification API destekleniyor:', supported);
-    
-    if (!supported) {
-      alert('❌ Tarayıcı bildirim desteklemiyor!');
-      return;
-    }
-    
-    // Mevcut izin durumu
-    const currentPermission = Notification.permission;
-    console.log('🔐 Mevcut izin durumu:', currentPermission);
-    
-    // İzin iste
-    if (currentPermission === 'default') {
-      const permission = await Notification.requestPermission();
-      console.log('📋 Yeni izin durumu:', permission);
-    }
-    
-    // Service Worker durumu
-    const swRegistered = 'serviceWorker' in navigator && navigator.serviceWorker.controller;
-    console.log('🔧 Service Worker aktif:', swRegistered);
-    
-    // Manual test bildirimi
-    if (Notification.permission === 'granted') {
-      console.log('✅ Manual test bildirimi gösteriliyor...');
+    try {
+      console.log('🔐 Notification izinleri kontrol ediliyor...');
+      alert('🔐 İzin kontrol başladı! Console\'a bak...');
       
-      new Notification('🧪 MANUAL TEST BİLDİRİM', {
-        body: 'Bu manuel test bildirimidir. Çalışıyorsa sistem OK!',
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        requireInteraction: true,
-        silent: true
-      });
+      // Notification API desteği
+      const supported = 'Notification' in window;
+      console.log('📱 Notification API destekleniyor:', supported);
       
-      // Service Worker üzerinden de test
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SHOW_NOTIFICATION',
-          title: '🔧 SERVICE WORKER TEST',
-          body: 'Service Worker üzerinden test bildirimi',
-          tag: 'sw-test'
-        });
+      if (!supported) {
+        alert('❌ Tarayıcı bildirim desteklemiyor!');
+        return;
       }
+      
+      // Mevcut izin durumu
+      const currentPermission = Notification.permission;
+      console.log('🔐 Mevcut izin durumu:', currentPermission);
+      
+      // İzin iste
+      if (currentPermission === 'default') {
+        console.log('📋 İzin isteniyor...');
+        const permission = await Notification.requestPermission();
+        console.log('📋 Yeni izin durumu:', permission);
+      }
+      
+      // Service Worker durumu
+      const swRegistered = 'serviceWorker' in navigator && navigator.serviceWorker.controller;
+      console.log('🔧 Service Worker aktif:', swRegistered);
+      
+      // Manual test bildirimi
+      if (Notification.permission === 'granted') {
+        console.log('✅ Manual test bildirimi gösteriliyor...');
+        
+        // Test 1: Direct Notification
+        const notification = new Notification('🧪 MANUAL TEST BİLDİRİM', {
+          body: 'Bu manuel test bildirimidir. Çalışıyorsa sistem OK!',
+          icon: '/favicon.ico',
+          requireInteraction: true,
+          silent: true
+        });
+        
+        console.log('📱 Direct notification oluşturuldu:', notification);
+        
+        // Test 2: Service Worker bildirimi
+        if (navigator.serviceWorker.controller) {
+          console.log('🔧 Service Worker test bildirimi gönderiliyor...');
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title: '🔧 SERVICE WORKER TEST',
+            body: 'Service Worker üzerinden test bildirimi',
+            tag: 'sw-test'
+          });
+        }
+      } else {
+        console.log('❌ Notification permission denied:', Notification.permission);
+      }
+      
+      // Sonuç raporu
+      const report = `🔐 Bildirim İzinleri:\n\nAPI Desteği: ${supported ? '✅' : '❌'}\nİzin Durumu: ${Notification.permission}\nService Worker: ${swRegistered ? '✅' : '❌'}\n\nManual test bildirimi gönderildi!`;
+      console.log('📊 Final rapor:', report);
+      alert(report);
+      
+    } catch (error) {
+      console.error('❌ İzin kontrol hatası:', error);
+      alert('❌ Hata: ' + error.message);
     }
+  };
+
+  const handleSimpleTest = () => {
+    console.log('🚀 Simple test clicked!');
+    alert('🚀 Simple test çalışıyor! Console\'a bak...');
     
-    alert(`🔐 Bildirim İzinleri:\n\nAPI Desteği: ${supported ? '✅' : '❌'}\nİzin Durumu: ${Notification.permission}\nService Worker: ${swRegistered ? '✅' : '❌'}\n\nManual test bildirimi gönderildi!`);
+    if ('Notification' in window) {
+      console.log('✅ Notification API mevcut, Permission:', Notification.permission);
+      alert('✅ Notification API mevcut - Permission: ' + Notification.permission);
+    } else {
+      console.log('❌ Notification API yok');
+      alert('❌ Notification API yok!');
+    }
   };
 
   const handleForceRefresh = async () => {
@@ -541,6 +570,12 @@ const CoachDashboard: React.FC = () => {
             className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
           >
             🔐 İzin Kontrol
+          </button>
+          <button
+            onClick={handleSimpleTest}
+            className="px-3 py-1 bg-orange-500 text-white text-sm rounded hover:bg-orange-600"
+          >
+            🚀 Basit Test
           </button>
           <div className="text-sm text-gray-600">
             Bildirimler: {notifications.length} | Okunmamış: {unreadCount} | Koç ID: {auth.user.id?.substring(0, 8)}...
