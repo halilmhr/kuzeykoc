@@ -1,4 +1,4 @@
-// Browser Notification Utility Functions
+// Simple Console Log Notification Service
 export class NotificationService {
   private static serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
 
@@ -30,9 +30,7 @@ export class NotificationService {
     return 'Notification' in window && Notification.permission === 'granted';
   }
 
-  static isMobile(): boolean {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  }
+
 
   static async sendNotification(title: string, options: {
     body?: string;
@@ -42,42 +40,14 @@ export class NotificationService {
   } = {}) {
     console.log('🔔 Bildirim gönderiliyor:', title, options.body);
     
-    // Titreşim ve ses her durumda
-    this.playNotificationSound();
-    
-    // Toast notification her zaman göster (backup olarak)
-    this.showInAppAlert(title, options.body || '');
-
-    // Service Worker ile bildirim gönder (mobil için daha iyi)
-    if (this.serviceWorkerRegistration && this.canSendNotifications()) {
-      try {
-        // Service Worker'a mesaj gönder
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            title: title,
-            body: options.body,
-            icon: options.icon || '/favicon.ico'
-          });
-        } else {
-          // Fallback: Direct notification
-          await this.serviceWorkerRegistration.showNotification(title, {
-            body: options.body,
-            icon: options.icon || '/favicon.ico',
-            badge: '/favicon.ico',
-            tag: options.tag || 'student-activity',
-            requireInteraction: false,
-            silent: false
-          } as any);
-        }
-        console.log('✅ Service Worker bildirimi gönderildi');
-        return true;
-      } catch (error) {
-        console.error('❌ Service Worker bildirimi gönderilemedi:', error);
-      }
+    // Android için özel modal alert
+    if (this.isMobile()) {
+      this.showAndroidModal(title, options.body || '');
+      this.playNotificationSound();
+      return null;
     }
 
-    // Fallback: Normal notification
+    // Desktop için normal notification
     if (this.canSendNotifications()) {
       try {
         const notification = new Notification(title, {
@@ -92,18 +62,129 @@ export class NotificationService {
           notification.close();
         }, 5000);
 
-        console.log('✅ Normal bildirim gönderildi');
+        console.log('✅ Desktop bildirim gönderildi');
         return notification;
       } catch (error) {
-        console.error('❌ Normal bildirim gönderilemedi:', error);
+        console.error('❌ Desktop bildirim gönderilemedi:', error);
       }
     }
 
-    console.log('ℹ️ Sadece in-app toast gösterildi');
+    console.log('ℹ️ Bildirim gönderilemedi');
     return null;
   }
 
-  // Mobile için in-app alert
+  // Mobil kontrol
+  private static isMobile(): boolean {
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
+  // Android için özel modal
+  private static showAndroidModal(title: string, body: string) {
+    // Mevcut modal'ları temizle
+    const existingModals = document.querySelectorAll('.android-notification-modal');
+    existingModals.forEach(modal => modal.remove());
+
+    const modal = document.createElement('div');
+    modal.className = 'android-notification-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease-out;
+    `;
+
+    const alertBox = document.createElement('div');
+    alertBox.style.cssText = `
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 90%;
+      width: 300px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      animation: slideUp 0.3s ease-out;
+    `;
+
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = title;
+    titleEl.style.cssText = `
+      margin: 0 0 15px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    `;
+
+    const bodyEl = document.createElement('p');
+    bodyEl.textContent = body;
+    bodyEl.style.cssText = `
+      margin: 0 0 20px 0;
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+    `;
+
+    const button = document.createElement('button');
+    button.textContent = 'Tamam';
+    button.style.cssText = `
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+    `;
+
+    button.onclick = () => {
+      modal.remove();
+    };
+
+    alertBox.appendChild(titleEl);
+    alertBox.appendChild(bodyEl);
+    alertBox.appendChild(button);
+    modal.appendChild(alertBox);
+
+    // CSS animasyonları ekle
+    if (!document.querySelector('#android-modal-animations')) {
+      const style = document.createElement('style');
+      style.id = 'android-modal-animations';
+      style.textContent = `
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(modal);
+
+    // Mobilde titreşim
+    if ('vibrate' in navigator) {
+      navigator.vibrate([400, 200, 400]);
+    }
+
+    // 10 saniye sonra otomatik kapat
+    setTimeout(() => {
+      if (modal.parentNode) {
+        modal.remove();
+      }
+    }, 10000);
+  }
+
+  // Desktop için toast alert
   static showInAppAlert(title: string, body: string) {
     // Mevcut toast'ları temizle
     const existingToasts = document.querySelectorAll('.toast-notification');
