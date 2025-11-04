@@ -78,7 +78,7 @@ export class NotificationService {
           badge: '/favicon.ico',
           tag: options.tag || 'coach-notification',
           requireInteraction: true, // Android'de bildirim ekranında kalır
-          silent: false,
+          silent: true, // Ses kapalı
           ...(('vibrate' in navigator) && { vibrate: [300, 200, 300] }),
           data: {
             url: '/', // Tıklandığında ana sayfaya git
@@ -292,11 +292,11 @@ export class NotificationService {
     }, 10000);
   }
 
-  // Notification sesi çal ve titreşim
+  // Notification titreşim (ses kaldırıldı)
   static playNotificationSound() {
-    console.log('🔊 Ses ve titreşim başlatılıyor...');
+    console.log('� Sadece titreşim başlatılıyor...');
     
-    // Güçlü vibration pattern (Android için)
+    // Sadece titreşim (Android için)
     if ('vibrate' in navigator) {
       // 3 kez güçlü titreşim
       navigator.vibrate([300, 200, 300, 200, 300]);
@@ -305,25 +305,8 @@ export class NotificationService {
       console.log('❌ Titreşim desteklenmiyor');
     }
 
-    try {
-      // Daha güçlü ve uzun beep sesi
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 1000; // 1000 Hz (daha yüksek)
-      gainNode.gain.value = 0.3; // Daha yüksek ses
-      
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.5); // 0.5 saniye
-      
-      console.log('🔔 Beep sesi çalındı');
-    } catch (error) {
-      console.log('❌ Ses çalınamadı:', error);
-    }
+    // Ses kaldırıldı - sadece titreşim
+    console.log('🔇 Ses devre dışı - sadece titreşim');
   }
 
   // Öğrenci aktivite bildirimleri için özel fonksiyonlar

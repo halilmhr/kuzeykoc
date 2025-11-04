@@ -61,7 +61,7 @@ async function checkForNewNotifications() {
         badge: '/favicon.ico',
         tag: notification.type,
         requireInteraction: true,
-        silent: false,
+        silent: true, // Ses kapalı
         vibrate: [400, 200, 400, 200, 400],
         data: {
           url: '/coach',
@@ -129,7 +129,7 @@ self.addEventListener('message', function(event) {
       badge: '/favicon.ico',
       tag: tag || 'coach-notification',
       requireInteraction: true,
-      silent: false,
+      silent: true, // Ses kapalı
       vibrate: [300, 200, 300, 200, 300],
       data: {
         url: '/coach',
