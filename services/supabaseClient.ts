@@ -572,15 +572,22 @@ export const addHomework = async (homeworkData: {
     studentId: string;
     coachId: string;
 }) => {
+    console.log('🔧 Adding homework with data:', homeworkData);
+    
+    const insertData = {
+        title: homeworkData.title,
+        description: homeworkData.description,
+        date: homeworkData.date,
+        student_id: homeworkData.studentId,
+        coach_id: homeworkData.coachId,
+        is_completed: false
+    };
+    
+    console.log('📝 Insert data:', insertData);
+    
     const { data, error } = await supabase
         .from('homework')
-        .insert([{
-            title: homeworkData.title,
-            description: homeworkData.description,
-            date: homeworkData.date,
-            student_id: homeworkData.studentId,
-            coach_id: homeworkData.coachId
-        }])
+        .insert([insertData])
         .select()
         .single();
 
