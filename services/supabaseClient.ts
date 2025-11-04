@@ -823,6 +823,7 @@ export async function createNotification(recipientId: string, type: string, titl
             .from('notifications')
             .insert({
                 recipient_id: recipientId,
+                coach_id: recipientId, // Coach'a gönderildiği için aynı ID
                 type: type,
                 title: title,
                 message: message,
@@ -848,7 +849,7 @@ export async function getUnreadNotifications(userId: string) {
         const { data, error } = await supabase
             .from('notifications')
             .select('*')
-            .eq('recipient_id', userId)
+            .eq('coach_id', userId)
             .eq('is_read', false)
             .order('created_at', { ascending: false });
 
@@ -861,6 +862,54 @@ export async function getUnreadNotifications(userId: string) {
     } catch (error) {
         console.error('Error fetching notifications:', error);
         return [];
+    }
+}
+
+// Debug: Test bildirimi oluştur
+export async function createTestNotification(coachId: string): Promise<boolean> {
+    console.log('🧪 Creating test notification for coach:', coachId);
+    
+    return await createNotification(
+        coachId,
+        'test_notification',
+        '🧪 TEST BİLDİRİM - Real-time Sistem Testi',
+        `Bu bir test bildirimidir. Zaman: ${new Date().toLocaleTimeString('tr-TR')}`,
+        { 
+            test: true, 
+            timestamp: new Date().toISOString(),
+            coachId: coachId
+        }
+    );
+}
+
+// Debug: Bildirim istatistikleri
+export async function getNotificationStats(coachId: string) {
+    try {
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('coach_id', coachId);
+
+        if (error) {
+            console.error('Error fetching notification stats:', error);
+            return null;
+        }
+
+        const stats = {
+            total: data?.length || 0,
+            unread: data?.filter(n => !n.is_read).length || 0,
+            today: data?.filter(n => {
+                const today = new Date().toDateString();
+                const notifDate = new Date(n.created_at).toDateString();
+                return today === notifDate;
+            }).length || 0
+        };
+
+        console.log('📊 Notification stats for coach', coachId, ':', stats);
+        return stats;
+    } catch (error) {
+        console.error('Error in getNotificationStats:', error);
+        return null;
     }
 }
 

@@ -9,7 +9,7 @@ import Calendar from '../components/common/Calendar';
 import HomeworkModal from '../components/common/HomeworkModal';
 import { Student, DailyLog, TrialExamResult, WeeklyProgram, ProgramTask, TitledWeeklyProgram, Coach, LeaderboardEntry, Homework } from '../types';
 import supabaseApi from '../services/supabaseApi';
-import { getUnreadNotifications, markNotificationAsRead } from '../services/supabaseClient';
+import { getUnreadNotifications, markNotificationAsRead, createTestNotification, getNotificationStats } from '../services/supabaseClient';
 import { NotificationService } from '../services/notificationService';
 
 interface AddStudentModalProps {
@@ -139,6 +139,7 @@ const CoachDashboard: React.FC = () => {
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   // Homework calendar states
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -180,6 +181,7 @@ const CoachDashboard: React.FC = () => {
         // İlk yükleme - mevcut bildirimleri al
         const initialNotifications = await getUnreadNotifications(auth.user.id);
         setNotifications(initialNotifications);
+        setUnreadCount(initialNotifications.length);
         console.log(`📊 ${initialNotifications.length} mevcut bildirim yüklendi`);
 
         // Supabase Real-time subscription kur
@@ -202,6 +204,7 @@ const CoachDashboard: React.FC = () => {
               
               // Bildirim listesine ekle
               setNotifications(prev => [newNotification, ...prev]);
+              setUnreadCount(prev => prev + 1);
               
               // Tarayıcı bildirimi göster
               NotificationService.sendNotification(newNotification.title, {
@@ -235,6 +238,7 @@ const CoachDashboard: React.FC = () => {
             
             if (trulyNew.length > 0) {
               setNotifications(newNotifications);
+              setUnreadCount(newNotifications.length);
               trulyNew.forEach(notification => {
                 NotificationService.sendNotification(notification.title, {
                   body: notification.message,
@@ -385,9 +389,57 @@ const CoachDashboard: React.FC = () => {
 
   if (!auth?.user) return null;
 
+  // Debug fonksiyonları
+  const handleTestNotification = async () => {
+    if (!auth?.user?.id) return;
+    
+    console.log('🧪 TEST BİLDİRİM oluşturuluyor...', auth.user.id);
+    const success = await createTestNotification(auth.user.id);
+    
+    if (success) {
+      alert('✅ Test bildirimi oluşturuldu! Real-time sistem kontrol ediliyor...');
+    } else {
+      alert('❌ Test bildirimi oluşturulamadı!');
+    }
+  };
+
+  const handleGetStats = async () => {
+    if (!auth?.user?.id) return;
+    
+    const stats = await getNotificationStats(auth.user.id);
+    if (stats) {
+      alert(`📊 Bildirim İstatistikleri:\n\nToplam: ${stats.total}\nOkunmamış: ${stats.unread}\nBugün: ${stats.today}\n\nKoç ID: ${auth.user.id}`);
+    } else {
+      alert('❌ İstatistikler alınamadı!');
+    }
+  };
+
   return (
     <>
       <Header user={auth.user} />
+      
+      {/* DEBUG PANEL */}
+      <div className="bg-yellow-100 border border-yellow-400 rounded-lg p-4 m-4">
+        <h3 className="font-bold text-yellow-800 mb-2">🧪 DEBUG PANEL</h3>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={handleTestNotification}
+            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+          >
+            🔔 Test Bildirimi Gönder
+          </button>
+          <button
+            onClick={handleGetStats}
+            className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+          >
+            📊 İstatistikleri Göster
+          </button>
+          <div className="text-sm text-gray-600">
+            Bildirimler: {notifications.length} | Okunmamış: {unreadCount}
+          </div>
+        </div>
+      </div>
+
       <AddStudentModal 
         isOpen={isAddStudentModalOpen}
         onClose={() => setIsAddStudentModalOpen(false)}
