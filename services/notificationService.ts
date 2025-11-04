@@ -2,7 +2,7 @@
 export class NotificationService {
   private static serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
 
-  static async init() {
+  static async initialize() {
     if ('serviceWorker' in navigator) {
       try {
         this.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js');
@@ -10,6 +10,12 @@ export class NotificationService {
       } catch (error) {
         console.error('❌ Service Worker kaydedilemedi:', error);
       }
+    }
+    
+    // Request notification permission
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      console.log('📱 Notification permission:', permission);
     }
   }
 
@@ -20,7 +26,7 @@ export class NotificationService {
     }
 
     // Service Worker'ı başlat
-    await this.init();
+    await this.initialize();
 
     const permission = await Notification.requestPermission();
     return permission === 'granted';
@@ -289,7 +295,7 @@ export class NotificationService {
 if (typeof window !== 'undefined') {
   // Sayfa yüklendiğinde service worker'ı başlat
   window.addEventListener('load', () => {
-    NotificationService.init();
+    NotificationService.initialize();
     
     setTimeout(() => {
       console.log('🔔 Bildirim sistemi başlatılıyor...');

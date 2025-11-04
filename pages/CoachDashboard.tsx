@@ -9,6 +9,8 @@ import Calendar from '../components/common/Calendar';
 import HomeworkModal from '../components/common/HomeworkModal';
 import { Student, DailyLog, TrialExamResult, WeeklyProgram, ProgramTask, TitledWeeklyProgram, Coach, LeaderboardEntry, Homework } from '../types';
 import supabaseApi from '../services/supabaseApi';
+import { getUnreadNotifications, markNotificationAsRead } from '../services/supabaseClient';
+import { NotificationService } from '../services/notificationService';
 
 interface AddStudentModalProps {
     isOpen: boolean;
@@ -136,15 +138,14 @@ const CoachDashboard: React.FC = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-  
+  const [notifications, setNotifications] = useState<any[]>([]);
+
   // Homework calendar states
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isHomeworkModalOpen, setIsHomeworkModalOpen] = useState(false);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [selectedDateHomework, setSelectedDateHomework] = useState<Homework[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  
-
 
   useEffect(() => {
     const fetchData = async () => {
@@ -166,6 +167,54 @@ const CoachDashboard: React.FC = () => {
       }
     };
     fetchData();
+  }, [auth?.user]);
+
+  // Notification polling system for coach
+  useEffect(() => {
+    if (!auth?.user || auth.user.role !== 'coach') return;
+
+    const checkForNewNotifications = async () => {
+      try {
+        const newNotifications = await getUnreadNotifications(auth.user.id);
+        
+        // Check for new notifications
+        const previousNotificationIds = new Set(notifications.map(n => n.id));
+        const trulyNewNotifications = newNotifications.filter(n => !previousNotificationIds.has(n.id));
+        
+        if (trulyNewNotifications.length > 0) {
+          // Show browser notification for each new notification
+          trulyNewNotifications.forEach(notification => {
+            NotificationService.sendNotification(notification.title, {
+              body: notification.message,
+              tag: notification.type
+            });
+          });
+          
+          console.log(`🔔 ${trulyNewNotifications.length} yeni bildirim alındı!`);
+        }
+        
+        setNotifications(newNotifications);
+      } catch (error) {
+        console.error('Error checking notifications:', error);
+      }
+    };
+
+    // İlk kontrol
+    checkForNewNotifications();
+    
+    // Her 3 saniyede bir kontrol et
+    const notificationInterval = setInterval(checkForNewNotifications, 3000);
+    
+    return () => {
+      clearInterval(notificationInterval);
+    };
+  }, [auth?.user, notifications]);
+
+  // Initialize notification service for coaches
+  useEffect(() => {
+    if (auth?.user && auth.user.role === 'coach') {
+      NotificationService.initialize();
+    }
   }, [auth?.user]);
   
   const handleStudentAdded = (newStudent: Student) => {

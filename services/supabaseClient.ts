@@ -404,19 +404,30 @@ export async function addDailyLog(logData: Omit<DailyLog, 'id'>): Promise<DailyL
         isNewEntry = true;
     }
 
-    // Send browser notification
+    // Send notification to coach
     try {
         const student = await getStudentById(logData.studentId);
-        if (student) {
-            // Bildirim gönder (sadece yeni giriş ise veya soru sayısı artmışsa)
-            NotificationService.notifyDailyLog(
-                student.fullName,
-                logData.subject,
-                logData.questionCount
+        const coachId = await getStudentCoach(logData.studentId);
+        
+        if (student && coachId) {
+            // Supabase notification to coach
+            await createNotification(
+                coachId,
+                'daily_log',
+                `📚 ${student.fullName} Çalışma Ekledi`,
+                `${logData.subject} dersinden ${logData.questionCount} soru çözdü`,
+                {
+                    studentId: logData.studentId,
+                    studentName: student.fullName,
+                    subject: logData.subject,
+                    questionCount: logData.questionCount,
+                    date: logData.date
+                }
             );
+            console.log('✅ Notification sent to coach:', coachId);
         }
     } catch (notificationError) {
-        console.error('Error sending notification:', notificationError);
+        console.error('Error sending notification to coach:', notificationError);
         // Don't fail the main operation if notification fails
     }
 
@@ -507,15 +518,29 @@ export async function addTrialExam(examData: Omit<TrialExamResult, 'id'>): Promi
         details: examData.details || []
     } as TrialExamResult;
 
-    // Send browser notification
+    // Send notification to coach
     try {
         const student = await getStudentById(examData.studentId);
-        if (student) {
-            NotificationService.notifyTrialExam(
-                student.fullName,
-                examData.examName,
-                examData.totalCorrect
+        const coachId = await getStudentCoach(examData.studentId);
+        
+        if (student && coachId) {
+            // Supabase notification to coach
+            await createNotification(
+                coachId,
+                'trial_exam',
+                `📝 ${student.fullName} Deneme Sınavı Ekledi`,
+                `${examData.examName}: ${examData.totalCorrect} doğru, ${examData.totalIncorrect} yanlış`,
+                {
+                    studentId: examData.studentId,
+                    studentName: student.fullName,
+                    examName: examData.examName,
+                    totalCorrect: examData.totalCorrect,
+                    totalIncorrect: examData.totalIncorrect,
+                    totalBlank: examData.totalBlank,
+                    date: examData.date
+                }
             );
+            console.log('✅ Trial exam notification sent to coach:', coachId);
         }
     } catch (notificationError) {
         console.error('Error sending trial exam notification:', notificationError);
@@ -743,18 +768,31 @@ export const updateHomework = async (id: string, updates: {
         createdAt: data.created_at
     };
 
-    // Send notification if homework was completed
+    // Send notification to coach if homework was completed
     if (updates.isCompleted === true) {
         try {
             const student = await getStudentById(data.student_id);
-            if (student) {
-                NotificationService.notifyHomeworkCompleted(
-                    student.fullName,
-                    data.title
+            const coachId = await getStudentCoach(data.student_id);
+            
+            if (student && coachId) {
+                // Supabase notification to coach
+                await createNotification(
+                    coachId,
+                    'homework_completed',
+                    `✅ ${student.fullName} Ödev Tamamladı`,
+                    `"${data.title}" ödevini tamamladı`,
+                    {
+                        studentId: data.student_id,
+                        studentName: student.fullName,
+                        homeworkId: data.id,
+                        homeworkTitle: data.title,
+                        completedAt: new Date().toISOString()
+                    }
                 );
+                console.log('✅ Homework completion notification sent to coach:', coachId);
             }
         } catch (notificationError) {
-            console.error('Error sending homework completion notification:', notificationError);
+            console.error('Error sending homework completion notification to coach:', notificationError);
         }
     }
 
@@ -774,5 +812,93 @@ export const deleteHomework = async (id: string) => {
 
     return true;
 };
+
+// Notifications
+export async function createNotification(recipientId: string, type: string, title: string, message: string, data?: any): Promise<boolean> {
+    try {
+        const { error } = await supabase
+            .from('notifications')
+            .insert({
+                recipient_id: recipientId,
+                type: type,
+                title: title,
+                message: message,
+                data: data,
+                is_read: false
+            });
+
+        if (error) {
+            console.error('Error creating notification:', error);
+            return false;
+        }
+
+        console.log('✅ Notification created for recipient:', recipientId);
+        return true;
+    } catch (error) {
+        console.error('Error creating notification:', error);
+        return false;
+    }
+}
+
+export async function getUnreadNotifications(userId: string) {
+    try {
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('recipient_id', userId)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching notifications:', error);
+            return [];
+        }
+
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        return [];
+    }
+}
+
+export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
+    try {
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', notificationId);
+
+        if (error) {
+            console.error('Error marking notification as read:', error);
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+        return false;
+    }
+}
+
+export async function getStudentCoach(studentId: string): Promise<string | null> {
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('coach_id')
+            .eq('id', studentId)
+            .eq('role', 'student')
+            .single();
+
+        if (error) {
+            console.error('Error getting student coach:', error);
+            return null;
+        }
+
+        return data?.coach_id || null;
+    } catch (error) {
+        console.error('Error getting student coach:', error);
+        return null;
+    }
+}
 
 
