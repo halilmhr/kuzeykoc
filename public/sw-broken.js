@@ -46,37 +46,37 @@ async function checkForNewNotifications() {
     const credentials = await credentialsResponse.json();
     
     // Direct Supabase API call for background notifications
-    const response = await fetch(`${credentials.url}/rest/v1/notifications?coach_id=eq.${coach.id}&is_read=eq.false&order=created_at.desc`, {
+    const response = await fetch(`${credentials.url}/rest/v1/notifications?recipient_id=eq.${coach.id}&is_read=eq.false&order=created_at.desc`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'apikey': credentials.anonKey,
-        'Authorization': `Bearer ${credentials.anonKey}`
+        'Authorization': `Bearer ${credentials.anonKey}`,
+        'Content-Type': 'application/json'
       }
     });
     
     if (!response.ok) {
-      console.log('❌ Failed to fetch notifications');
+      console.log('❌ Background API çağrısı başarısız:', response.status);
       return;
     }
     
     const notifications = await response.json();
     
-    // Show notifications that aren't shown yet
+    // Check for new notifications since last check
     const lastCheck = await getLastNotificationCheck();
     const newNotifications = notifications.filter(n => 
       new Date(n.created_at) > new Date(lastCheck)
     );
     
-    console.log(`🔔 ${newNotifications.length} yeni bildirim bulundu`);
+    console.log(`� ${newNotifications.length} yeni bildirim bulundu`);
     
-    // Show each new notification
+    // Show notifications
     for (const notification of newNotifications) {
       await self.registration.showNotification(notification.title, {
         body: notification.message,
         icon: '/favicon.ico',
         badge: '/favicon.ico',
-        tag: 'coach-notification-' + notification.id,
+        tag: notification.type,
         requireInteraction: true,
         silent: true,
         vibrate: [400, 200, 400, 200, 400],
@@ -105,6 +105,50 @@ async function checkForNewNotifications() {
     
   } catch (error) {
     console.error('❌ Background notification check hatası:', error);
+  }
+}
+    
+    // Show notifications that aren't shown yet
+    const lastCheck = await getLastNotificationCheck();
+    const newNotifications = notifications.filter(n => 
+      new Date(n.created_at) > new Date(lastCheck)
+    );
+    
+    for (const notification of newNotifications) {
+      await self.registration.showNotification(notification.title, {
+        body: notification.message,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: notification.type,
+        requireInteraction: true,
+        silent: true, // Ses kapalı
+        vibrate: [400, 200, 400, 200, 400],
+        data: {
+          url: '/coach',
+          notificationId: notification.id,
+          timestamp: notification.created_at
+        },
+        actions: [
+          {
+            action: 'open',
+            title: '📱 Koç Panelini Aç',
+            icon: '/favicon.ico'
+          },
+          {
+            action: 'close',
+            title: '✕ Kapat'
+          }
+        ]
+      });
+    }
+    
+    // Update last check time
+    await setLastNotificationCheck(new Date().toISOString());
+    
+    console.log(`✅ Background check complete: ${newNotifications.length} new notifications`);
+    
+  } catch (error) {
+    console.error('❌ Background notification check failed:', error);
   }
 }
 
