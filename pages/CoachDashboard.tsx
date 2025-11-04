@@ -206,14 +206,39 @@ const CoachDashboard: React.FC = () => {
               setNotifications(prev => [newNotification, ...prev]);
               setUnreadCount(prev => prev + 1);
               
-              // Tarayıcı bildirimi göster
+              // Tarayıcı bildirimi göster - MULTIPLE METHODS
+              console.log('🔔 Real-time bildirim gösteriliyor:', newNotification.title);
+              
+              // Method 1: NotificationService
               NotificationService.sendNotification(newNotification.title, {
                 body: newNotification.message,
                 tag: newNotification.type,
                 data: newNotification.data
               });
               
-              console.log('✅ Real-time bildirim işlendi');
+              // Method 2: Direct Notification API (backup)
+              if (Notification.permission === 'granted') {
+                new Notification(newNotification.title, {
+                  body: newNotification.message,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico',
+                  requireInteraction: true,
+                  silent: true,
+                  tag: 'realtime-' + newNotification.id
+                });
+              }
+              
+              // Method 3: Service Worker (backup)
+              if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                  type: 'SHOW_NOTIFICATION',
+                  title: newNotification.title,
+                  body: newNotification.message,
+                  tag: 'realtime-sw-' + newNotification.id
+                });
+              }
+              
+              console.log('✅ Real-time bildirim işlendi (3 yöntem denendi)');
             }
           )
           .subscribe((status) => {
@@ -414,6 +439,58 @@ const CoachDashboard: React.FC = () => {
     }
   };
 
+  const handleCheckNotificationPermission = async () => {
+    console.log('🔐 Notification izinleri kontrol ediliyor...');
+    
+    // Notification API desteği
+    const supported = 'Notification' in window;
+    console.log('📱 Notification API destekleniyor:', supported);
+    
+    if (!supported) {
+      alert('❌ Tarayıcı bildirim desteklemiyor!');
+      return;
+    }
+    
+    // Mevcut izin durumu
+    const currentPermission = Notification.permission;
+    console.log('🔐 Mevcut izin durumu:', currentPermission);
+    
+    // İzin iste
+    if (currentPermission === 'default') {
+      const permission = await Notification.requestPermission();
+      console.log('📋 Yeni izin durumu:', permission);
+    }
+    
+    // Service Worker durumu
+    const swRegistered = 'serviceWorker' in navigator && navigator.serviceWorker.controller;
+    console.log('🔧 Service Worker aktif:', swRegistered);
+    
+    // Manual test bildirimi
+    if (Notification.permission === 'granted') {
+      console.log('✅ Manual test bildirimi gösteriliyor...');
+      
+      new Notification('🧪 MANUAL TEST BİLDİRİM', {
+        body: 'Bu manuel test bildirimidir. Çalışıyorsa sistem OK!',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        requireInteraction: true,
+        silent: true
+      });
+      
+      // Service Worker üzerinden de test
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title: '🔧 SERVICE WORKER TEST',
+          body: 'Service Worker üzerinden test bildirimi',
+          tag: 'sw-test'
+        });
+      }
+    }
+    
+    alert(`🔐 Bildirim İzinleri:\n\nAPI Desteği: ${supported ? '✅' : '❌'}\nİzin Durumu: ${Notification.permission}\nService Worker: ${swRegistered ? '✅' : '❌'}\n\nManual test bildirimi gönderildi!`);
+  };
+
   const handleForceRefresh = async () => {
     if (!auth?.user?.id) return;
     
@@ -458,6 +535,12 @@ const CoachDashboard: React.FC = () => {
             className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
           >
             🔄 Zorla Yenile
+          </button>
+          <button
+            onClick={handleCheckNotificationPermission}
+            className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+          >
+            🔐 İzin Kontrol
           </button>
           <div className="text-sm text-gray-600">
             Bildirimler: {notifications.length} | Okunmamış: {unreadCount} | Koç ID: {auth.user.id?.substring(0, 8)}...
