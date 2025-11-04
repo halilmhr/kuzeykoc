@@ -302,41 +302,102 @@ export async function getDailyLogsByStudent(studentId: string): Promise<DailyLog
         return [];
     }
     
-    // Map database fields to TypeScript interface
-    return data.map(log => ({
+    // Map database fields to TypeScript interface and merge same day same subject entries
+    const rawLogs = data.map(log => ({
         id: log.id,
         studentId: log.student_id,
         subject: log.subject,
         questionCount: log.question_count,
         date: log.date
     })) as DailyLog[];
+
+    // Group by date and subject, then sum question counts
+    const mergedLogs = rawLogs.reduce((acc: DailyLog[], current) => {
+        const existingIndex = acc.findIndex(
+            log => log.date === current.date && log.subject === current.subject
+        );
+        
+        if (existingIndex !== -1) {
+            // Merge with existing entry
+            acc[existingIndex].questionCount += current.questionCount;
+        } else {
+            // Add new entry
+            acc.push({
+                ...current,
+                id: current.id // Keep the first ID for reference
+            });
+        }
+        
+        return acc;
+    }, []);
+
+    return mergedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function addDailyLog(logData: Omit<DailyLog, 'id'>): Promise<DailyLog | null> {
-    const { data, error } = await supabase
+    // First check if there's already a log for the same day and subject
+    const { data: existingLog, error: searchError } = await supabase
         .from('daily_logs')
-        .insert([{
-            student_id: logData.studentId,
-            subject: logData.subject,
-            question_count: logData.questionCount,
-            date: logData.date
-        }])
-        .select()
+        .select('*')
+        .eq('student_id', logData.studentId)
+        .eq('subject', logData.subject)
+        .eq('date', logData.date)
         .single();
-    
-    if (error) {
-        console.error('Error adding daily log:', error);
+
+    if (searchError && searchError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error searching for existing daily log:', searchError);
         return null;
     }
-    
-    // Map database fields to TypeScript interface
-    return {
-        id: data.id,
-        studentId: data.student_id,
-        subject: data.subject,
-        questionCount: data.question_count,
-        date: data.date
-    } as DailyLog;
+
+    if (existingLog) {
+        // Update existing log by adding question counts
+        const newQuestionCount = existingLog.question_count + logData.questionCount;
+        
+        const { data: updatedData, error: updateError } = await supabase
+            .from('daily_logs')
+            .update({ question_count: newQuestionCount })
+            .eq('id', existingLog.id)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Error updating daily log:', updateError);
+            return null;
+        }
+
+        return {
+            id: updatedData.id,
+            studentId: updatedData.student_id,
+            subject: updatedData.subject,
+            questionCount: updatedData.question_count,
+            date: updatedData.date
+        } as DailyLog;
+    } else {
+        // Insert new log
+        const { data, error } = await supabase
+            .from('daily_logs')
+            .insert([{
+                student_id: logData.studentId,
+                subject: logData.subject,
+                question_count: logData.questionCount,
+                date: logData.date
+            }])
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('Error adding daily log:', error);
+            return null;
+        }
+
+        return {
+            id: data.id,
+            studentId: data.student_id,
+            subject: data.subject,
+            questionCount: data.question_count,
+            date: data.date
+        } as DailyLog;
+    }
 }
 
 // Trial Exams

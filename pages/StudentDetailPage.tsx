@@ -121,6 +121,47 @@ const StudentDetailPage: React.FC = () => {
     return homework.map(hw => hw.date);
   };
 
+  // Daily log analysis functions
+  const getDailyLogDates = () => {
+    // Ensure consistent date format
+    return dailyLogs.map(log => {
+      // If log.date is already in YYYY-MM-DD format, use it directly
+      if (typeof log.date === 'string' && log.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return log.date;
+      }
+      // Otherwise convert to consistent format
+      return new Date(log.date).toISOString().split('T')[0];
+    });
+  };
+
+  const getSelectedDateLogs = () => {
+    if (!selectedDate) return [];
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    
+    return dailyLogs.filter(log => {
+      // Normalize log date to YYYY-MM-DD format
+      let logDateStr;
+      if (typeof log.date === 'string' && log.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        logDateStr = log.date;
+      } else {
+        logDateStr = new Date(log.date).toISOString().split('T')[0];
+      }
+      return logDateStr === dateStr;
+    });
+  };
+
+  const getSubjectColor = (subject: string) => {
+    const colors: { [key: string]: string } = {
+      'Türkçe': 'bg-sky-500',
+      'Matematik': 'bg-violet-500', 
+      'Fen Bilimleri': 'bg-emerald-500',
+      'T.C. İnkılap Tarihi': 'bg-amber-500',
+      'Din Kültürü': 'bg-green-500',
+      'İngilizce': 'bg-red-500'
+    };
+    return colors[subject] || 'bg-gray-500';
+  };
+
 
   if (!auth?.user) return null;
 
@@ -147,14 +188,29 @@ const StudentDetailPage: React.FC = () => {
     );
   }
 
-  // Process data for charts
+  // Process data for charts - normalize dates for consistency
   const dailyLogChartData = dailyLogs.reduce((acc, log) => {
-    let entry = acc.find(item => item.date === log.date);
+    // Normalize date format
+    let normalizedDate;
+    if (typeof log.date === 'string' && log.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      normalizedDate = log.date;
+    } else {
+      normalizedDate = new Date(log.date).toISOString().split('T')[0];
+    }
+
+    let entry = acc.find(item => item.date === normalizedDate);
     if (!entry) {
-        entry = { date: log.date };
+        entry = { date: normalizedDate };
         acc.push(entry);
     }
-    entry[log.subject] = log.questionCount;
+    
+    // If same subject already exists for this date, add to existing count
+    if (entry[log.subject]) {
+      entry[log.subject] += log.questionCount;
+    } else {
+      entry[log.subject] = log.questionCount;
+    }
+    
     return acc;
   }, [] as any[]);
 
@@ -358,23 +414,84 @@ const StudentDetailPage: React.FC = () => {
             )}
 
             {activeTab === 'soru-analizi' && (
-                <Card title="Günlük Soru Sayısı Raporu">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={dailyLogChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#e0e0e0'} />
-                            <XAxis dataKey="date" tick={{fill: chartTextColor}} />
-                            <YAxis tick={{fill: chartTextColor}} />
-                            <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)', color: chartTextColor, backdropFilter: 'blur(5px)', borderRadius: '0.75rem', border: `1px solid ${theme === 'dark' ? '#334155' : 'rgba(0,0,0,0.1)'}` }} />
-                            <Legend wrapperStyle={{ color: chartTextColor }}/>
-                            <Bar dataKey="Türkçe" stackId="a" fill="#8b5cf6" />
-                            <Bar dataKey="Matematik" stackId="a" fill="#c026d3" />
-                            <Bar dataKey="Fen Bilimleri" stackId="a" fill="#38bdf8" />
-                            <Bar dataKey="T.C. İnkılap Tarihi" stackId="a" fill="#f59e0b" />
-                            <Bar dataKey="Din Kültürü" stackId="a" fill="#10b981" />
-                            <Bar dataKey="İngilizce" stackId="a" fill="#ef4444" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </Card>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Calendar */}
+                  <Card title="📅 Günlük Çalışma Takvimi">
+                    <Calendar
+                      selectedDate={selectedDate}
+                      onDateSelect={handleDateSelect}
+                      homeworkDates={getDailyLogDates()}
+                    />
+                  </Card>
+
+                  {/* Selected Date Details */}
+                  <Card title={selectedDate ? 
+                    `${selectedDate.toLocaleDateString('tr-TR', { 
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long'
+                    })} - Çözdüğü Sorular` : 
+                    "Tarih Seçin"
+                  }>
+                    {selectedDate ? (
+                      getSelectedDateLogs().length > 0 ? (
+                        <div className="space-y-3">
+                          {getSelectedDateLogs().map((log, index) => (
+                            <div key={`${log.subject}-${log.date}-${index}`} className="p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className={`w-4 h-4 rounded-full ${getSubjectColor(log.subject)}`}></div>
+                                  <h5 className="font-medium text-violet-800 dark:text-violet-200">{log.subject}</h5>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-violet-700 dark:text-violet-300">{log.questionCount} soru</p>
+                                  <p className="text-xs text-violet-500 dark:text-violet-400">{new Date(log.date).toLocaleDateString('tr-TR')}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-emerald-800 dark:text-emerald-200">Günlük Toplam:</span>
+                              <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                                {getSelectedDateLogs().reduce((sum, log) => sum + log.questionCount, 0)} soru
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[var(--text-secondary)] italic text-center py-8">
+                          Bu tarih için soru çözüm kaydı bulunmuyor.
+                        </p>
+                      )
+                    ) : (
+                      <p className="text-sm text-[var(--text-secondary)] italic text-center py-8">
+                        Günlük soru detaylarını görmek için takvimden bir tarih seçin.
+                      </p>
+                    )}
+                  </Card>
+
+                  {/* Chart */}
+                  <div className="lg:col-span-2">
+                    <Card title="Günlük Soru Sayısı Grafiği">
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={dailyLogChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#e0e0e0'} />
+                                <XAxis dataKey="date" tick={{fill: chartTextColor}} />
+                                <YAxis tick={{fill: chartTextColor}} />
+                                <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)', color: chartTextColor, backdropFilter: 'blur(5px)', borderRadius: '0.75rem', border: `1px solid ${theme === 'dark' ? '#334155' : 'rgba(0,0,0,0.1)'}` }} />
+                                <Legend wrapperStyle={{ color: chartTextColor }}/>
+                                <Bar dataKey="Türkçe" stackId="a" fill="#8b5cf6" />
+                                <Bar dataKey="Matematik" stackId="a" fill="#c026d3" />
+                                <Bar dataKey="Fen Bilimleri" stackId="a" fill="#38bdf8" />
+                                <Bar dataKey="T.C. İnkılap Tarihi" stackId="a" fill="#f59e0b" />
+                                <Bar dataKey="Din Kültürü" stackId="a" fill="#10b981" />
+                                <Bar dataKey="İngilizce" stackId="a" fill="#ef4444" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </Card>
+                  </div>
+                </div>
             )}
 
             {activeTab === 'deneme-analizi' && (
