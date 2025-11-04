@@ -323,6 +323,13 @@ export class NotificationService {
       tag: 'trial_exam'
     });
   }
+
+  static notifyDailyHomeworkCompleted(studentName: string, homeworkCount: number, date: string) {
+    return this.sendNotification(`🎉 ${studentName} Günlük Ödevleri Tamamladı!`, {
+      body: `${date} tarihli ${homeworkCount} ödevini tamamen bitirdi`,
+      tag: 'daily_homework_completed'
+    });
+  }
 }
 
 // Auto-initialize notification permission request

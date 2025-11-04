@@ -775,7 +775,7 @@ export const updateHomework = async (id: string, updates: {
             const coachId = await getStudentCoach(data.student_id);
             
             if (student && coachId) {
-                // Supabase notification to coach
+                // 1. Single homework completion notification
                 await createNotification(
                     coachId,
                     'homework_completed',
@@ -790,6 +790,9 @@ export const updateHomework = async (id: string, updates: {
                     }
                 );
                 console.log('✅ Homework completion notification sent to coach:', coachId);
+
+                // 2. Check if all daily homework completed
+                await checkDailyHomeworkCompletion(data.student_id, data.date, coachId, student.fullName);
             }
         } catch (notificationError) {
             console.error('Error sending homework completion notification to coach:', notificationError);
@@ -898,6 +901,52 @@ export async function getStudentCoach(studentId: string): Promise<string | null>
     } catch (error) {
         console.error('Error getting student coach:', error);
         return null;
+    }
+}
+
+// Check if all homework for the day is completed
+async function checkDailyHomeworkCompletion(studentId: string, date: string, coachId: string, studentName: string): Promise<void> {
+    try {
+        const { data: todaysHomework, error } = await supabase
+            .from('homework')
+            .select('*')
+            .eq('student_id', studentId)
+            .eq('date', date);
+
+        if (error) {
+            console.error('Error checking daily homework:', error);
+            return;
+        }
+
+        if (!todaysHomework || todaysHomework.length === 0) return;
+
+        // Check if all homework for the day is completed
+        const allCompleted = todaysHomework.every(hw => hw.is_completed === true);
+        const totalHomework = todaysHomework.length;
+
+        if (allCompleted && totalHomework > 0) {
+            // Get homework titles for better message
+            const homeworkTitles = todaysHomework.map(hw => hw.title).join(', ');
+            
+            // Send daily completion notification
+            await createNotification(
+                coachId,
+                'daily_homework_completed',
+                `🎉 ${studentName} Günlük Ödevleri Tamamladı!`,
+                `${date} tarihli ${totalHomework} ödevini tamamen bitirdi: ${homeworkTitles}`,
+                {
+                    studentId: studentId,
+                    studentName: studentName,
+                    date: date,
+                    totalHomework: totalHomework,
+                    homeworkTitles: homeworkTitles,
+                    completedAt: new Date().toISOString()
+                }
+            );
+            console.log('🎉 Daily homework completion notification sent to coach:', coachId);
+        }
+    } catch (error) {
+        console.error('Error checking daily homework completion:', error);
     }
 }
 
