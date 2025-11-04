@@ -169,66 +169,109 @@ const CoachDashboard: React.FC = () => {
     fetchData();
   }, [auth?.user]);
 
-  // Notification polling system for coach
+  // Real-time notification system for coach using Supabase subscriptions
   useEffect(() => {
     if (!auth?.user || auth.user.role !== 'coach') return;
 
-    const checkForNewNotifications = async () => {
+    let subscription: any = null;
+
+    const setupRealtimeNotifications = async () => {
       try {
-        const newNotifications = await getUnreadNotifications(auth.user.id);
+        // İlk yükleme - mevcut bildirimleri al
+        const initialNotifications = await getUnreadNotifications(auth.user.id);
+        setNotifications(initialNotifications);
+        console.log(`📊 ${initialNotifications.length} mevcut bildirim yüklendi`);
+
+        // Supabase Real-time subscription kur
+        const { supabase } = await import('../services/supabaseClient');
         
-        // Check for new notifications
-        const previousNotificationIds = new Set(notifications.map(n => n.id));
-        const trulyNewNotifications = newNotifications.filter(n => !previousNotificationIds.has(n.id));
-        
-        if (trulyNewNotifications.length > 0) {
-          // Show browser notification for each new notification
-          trulyNewNotifications.forEach(notification => {
-            NotificationService.sendNotification(notification.title, {
-              body: notification.message,
-              tag: notification.type
-            });
+        subscription = supabase
+          .channel('notifications-channel')
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `coach_id=eq.${auth.user.id}`
+            },
+            (payload) => {
+              console.log('🔔 GERÇEK ZAMANLI BİLDİRİM:', payload.new);
+              
+              const newNotification = payload.new;
+              
+              // Bildirim listesine ekle
+              setNotifications(prev => [newNotification, ...prev]);
+              
+              // Tarayıcı bildirimi göster
+              NotificationService.sendNotification(newNotification.title, {
+                body: newNotification.message,
+                tag: newNotification.type,
+                data: newNotification.data
+              });
+              
+              console.log('✅ Real-time bildirim işlendi');
+            }
+          )
+          .subscribe((status) => {
+            console.log('� Supabase subscription durumu:', status);
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Real-time bildirimler aktif!');
+            }
           });
-          
-          console.log(`🔔 ${trulyNewNotifications.length} yeni bildirim alındı!`);
-        }
+
+        console.log('🚀 Real-time bildirim sistemi kuruldu');
         
-        setNotifications(newNotifications);
       } catch (error) {
-        console.error('Error checking notifications:', error);
+        console.error('❌ Real-time bildirim kurulumu başarısız:', error);
+        
+        // Fallback: Polling sistemi
+        console.log('🔄 Fallback polling sistemi başlatılıyor...');
+        const fallbackInterval = setInterval(async () => {
+          try {
+            const newNotifications = await getUnreadNotifications(auth.user.id);
+            const previousIds = new Set(notifications.map(n => n.id));
+            const trulyNew = newNotifications.filter(n => !previousIds.has(n.id));
+            
+            if (trulyNew.length > 0) {
+              setNotifications(newNotifications);
+              trulyNew.forEach(notification => {
+                NotificationService.sendNotification(notification.title, {
+                  body: notification.message,
+                  tag: notification.type
+                });
+              });
+            }
+          } catch (pollError) {
+            console.error('Polling error:', pollError);
+          }
+        }, 10000); // 10 saniye fallback
+        
+        return () => clearInterval(fallbackInterval);
       }
     };
 
-    // İlk kontrol
-    checkForNewNotifications();
+    setupRealtimeNotifications();
     
-    // Her 5 saniyede bir kontrol et (daha az kaynak tüketimi)
-    const notificationInterval = setInterval(checkForNewNotifications, 5000);
-    
-    // Page Visibility API - Tab'ı geri getirdiğinde hemen kontrol et
+    // Page Visibility API - Tab geri geldiğinde güncelle
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('📱 Tab aktif oldu, bildirimleri kontrol ediliyor...');
-        checkForNewNotifications();
+        console.log('�️ Tab aktif - bildirimleri güncelliyorum...');
+        getUnreadNotifications(auth.user.id).then(setNotifications);
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Online/Offline durumunu takip et
-    const handleOnline = () => {
-      console.log('🌐 İnternet bağlantısı geri geldi, bildirimleri kontrol ediliyor...');
-      checkForNewNotifications();
-    };
-    
-    window.addEventListener('online', handleOnline);
-    
     return () => {
-      clearInterval(notificationInterval);
+      // Cleanup
+      if (subscription) {
+        subscription.unsubscribe();
+        console.log('🔌 Real-time subscription kapatıldı');
+      }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('online', handleOnline);
     };
-  }, [auth?.user, notifications]);
+  }, [auth?.user]); // notifications dependency kaldırıldı - infinite loop önlemek için
 
   // Initialize notification service for coaches
   useEffect(() => {
@@ -236,7 +279,7 @@ const CoachDashboard: React.FC = () => {
       NotificationService.initialize().then(() => {
         console.log('🔔 Koç için bildirim sistemi hazır');
         
-        // Store coach data for background sync
+        // Store coach data and Supabase credentials for background sync
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({
             type: 'STORE_COACH_DATA',
@@ -246,7 +289,32 @@ const CoachDashboard: React.FC = () => {
               email: auth.user.email
             }
           });
+          
+          // Store Supabase credentials for background API calls
+          navigator.serviceWorker.controller.postMessage({
+            type: 'STORE_SUPABASE_CREDENTIALS',
+            credentials: {
+              url: import.meta.env.VITE_SUPABASE_URL,
+              anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY
+            }
+          });
         }
+
+        // Visibility API - inform service worker about page visibility
+        const handleVisibilityChange = () => {
+          const isVisible = !document.hidden;
+          if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'VISIBILITY_CHANGE',
+              isVisible: isVisible
+            });
+          }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Initial visibility state
+        handleVisibilityChange();
       });
     }
   }, [auth?.user]);

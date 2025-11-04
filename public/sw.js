@@ -22,24 +22,91 @@ self.addEventListener('periodicsync', function(event) {
 // Check for notifications in background
 async function checkForNewNotifications() {
   try {
-    console.log('🔍 Checking notifications in background...');
+    console.log('🔍 Background notification check başladı...');
     
-    // Get stored coach ID from indexed DB or cache
+    // Get stored coach data
     const cache = await caches.open('coach-cache');
     const coachData = await cache.match('/coach-data');
     
     if (!coachData) {
-      console.log('❌ No coach data found in cache');
+      console.log('❌ Cache\'de koç verisi yok');
       return;
     }
     
     const coach = await coachData.json();
     if (!coach.id) return;
     
-    // For now, skip background fetching and rely on active polling
-    // TODO: Implement proper background sync with Supabase credentials
-    console.log('📱 Background sync triggered, but skipping API call for now');
-    return;
+    // Get Supabase credentials from cache
+    const credentialsResponse = await cache.match('/supabase-credentials');
+    if (!credentialsResponse) {
+      console.log('❌ Supabase credentials bulunamadı');
+      return;
+    }
+    
+    const credentials = await credentialsResponse.json();
+    
+    // Direct Supabase API call for background notifications
+    const response = await fetch(`${credentials.url}/rest/v1/notifications?recipient_id=eq.${coach.id}&is_read=eq.false&order=created_at.desc`, {
+      method: 'GET',
+      headers: {
+        'apikey': credentials.anonKey,
+        'Authorization': `Bearer ${credentials.anonKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log('❌ Background API çağrısı başarısız:', response.status);
+      return;
+    }
+    
+    const notifications = await response.json();
+    
+    // Check for new notifications since last check
+    const lastCheck = await getLastNotificationCheck();
+    const newNotifications = notifications.filter(n => 
+      new Date(n.created_at) > new Date(lastCheck)
+    );
+    
+    console.log(`� ${newNotifications.length} yeni bildirim bulundu`);
+    
+    // Show notifications
+    for (const notification of newNotifications) {
+      await self.registration.showNotification(notification.title, {
+        body: notification.message,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: notification.type,
+        requireInteraction: true,
+        silent: true,
+        vibrate: [400, 200, 400, 200, 400],
+        data: {
+          url: '/coach',
+          notificationId: notification.id,
+          timestamp: notification.created_at
+        },
+        actions: [
+          {
+            action: 'open',
+            title: '📱 Koç Panelini Aç',
+            icon: '/favicon.ico'
+          },
+          {
+            action: 'close',
+            title: '✕ Kapat'
+          }
+        ]
+      });
+    }
+    
+    // Update last check time
+    await setLastNotificationCheck(new Date().toISOString());
+    console.log('✅ Background notification check tamamlandı');
+    
+  } catch (error) {
+    console.error('❌ Background notification check hatası:', error);
+  }
+}
     
     if (!response.ok) {
       console.log('❌ Failed to fetch notifications');
@@ -161,7 +228,54 @@ self.addEventListener('message', function(event) {
       console.log('💾 Coach data stored for background sync');
     });
   }
+  
+  // Store Supabase credentials for background API calls
+  if (event.data && event.data.type === 'STORE_SUPABASE_CREDENTIALS') {
+    const credentials = event.data.credentials;
+    caches.open('coach-cache').then(cache => {
+      cache.put('/supabase-credentials', new Response(JSON.stringify(credentials)));
+      console.log('🔑 Supabase credentials stored for background sync');
+      // Start background checking when credentials are available
+      startBackgroundNotificationCheck();
+    });
+  }
+  
+  // Handle visibility changes
+  if (event.data && event.data.type === 'VISIBILITY_CHANGE') {
+    isAppVisible = event.data.isVisible;
+    console.log(`👁️ App visibility changed: ${isAppVisible ? 'visible' : 'hidden'}`);
+  }
 });
+
+// Background notification checking timer
+let backgroundTimer;
+let isAppVisible = true;
+
+function startBackgroundNotificationCheck() {
+  if (backgroundTimer) {
+    clearInterval(backgroundTimer);
+  }
+  
+  console.log('⏰ Starting background notification check every 30 seconds');
+  
+  // Check immediately
+  checkForNewNotifications();
+  
+  // Check every 30 seconds, more frequent when app is hidden
+  backgroundTimer = setInterval(() => {
+    const checkInterval = isAppVisible ? 30000 : 15000; // 15 seconds when hidden
+    console.log(`🔍 Background check for new notifications (app ${isAppVisible ? 'visible' : 'hidden'})`);
+    checkForNewNotifications();
+  }, 15000); // Check every 15 seconds
+}
+
+function stopBackgroundNotificationCheck() {
+  if (backgroundTimer) {
+    clearInterval(backgroundTimer);
+    backgroundTimer = null;
+    console.log('⏹️ Background notification check stopped');
+  }
+}
 
 // Install event
 self.addEventListener('install', function(event) {
