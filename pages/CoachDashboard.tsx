@@ -282,17 +282,7 @@ const CoachDashboard: React.FC = () => {
                               <p className="font-semibold text-[var(--text-primary)]">{student.fullName || 'İsimsiz'}</p>
                               <p className="text-sm text-[var(--text-secondary)]">{student.email || 'Email yok'}</p>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleAddHomework(student);
-                              }}
-                              className="mr-2 px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-md transition-colors"
-                              title="Ödev Ver"
-                            >
-                              📝
-                            </button>
+
                           </div>
                           <div className="flex items-center space-x-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-400 transition-transform duration-300 transform group-hover:translate-x-1 group-hover:text-violet-600" viewBox="0 0 20 20" fill="currentColor">

@@ -6,21 +6,13 @@ import { AuthContext } from '../App';
 import Header from '../components/common/Header';
 import Card from '../components/common/Card';
 import Spinner from '../components/common/Spinner';
-import { Student, DailyLog, TrialExamResult, WeeklyProgram, ProgramTask, TitledWeeklyProgram, Homework } from '../types';
+import { Student, DailyLog, TrialExamResult, Homework } from '../types';
 import supabaseApi from '../services/supabaseApi';
 import { useTheme } from '../contexts/ThemeContext';
 import Calendar from '../components/common/Calendar';
 import HomeworkModal from '../components/common/HomeworkModal';
 
-const DAYS_OF_WEEK = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 
-const getInitialProgram = (): WeeklyProgram => {
-    const program: WeeklyProgram = {};
-    DAYS_OF_WEEK.forEach(day => {
-      program[day] = [];
-    });
-    return program;
-};
 
 const StudentDetailPage: React.FC = () => {
   const auth = useContext(AuthContext);
@@ -31,13 +23,7 @@ const StudentDetailPage: React.FC = () => {
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [trialExams, setTrialExams] = useState<TrialExamResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weeklyProgram, setWeeklyProgram] = useState<WeeklyProgram>(getInitialProgram());
-  const [programTitle, setProgramTitle] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState('program');
-  const [openDay, setOpenDay] = useState<string | null>('Pazartesi');
-  const [openTrackingProgramId, setOpenTrackingProgramId] = useState<string | null>(null);
   const [openExamId, setOpenExamId] = useState<number | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
@@ -61,28 +47,6 @@ const StudentDetailPage: React.FC = () => {
     } else {
       alert('Öğrenci silinirken bir hata oluştu!');
     }
-  };
-
-  const calculateProgramCompletion = (program: WeeklyProgram): number => {
-    let totalTasks = 0;
-    let completedTasks = 0;
-
-    Object.values(program).forEach(dayTasks => {
-        if (Array.isArray(dayTasks)) {
-            dayTasks.forEach(task => {
-                totalTasks++;
-                if (task.isCompleted) {
-                    completedTasks++;
-                }
-            });
-        }
-    });
-
-    if (totalTasks === 0) {
-        return 0;
-    }
-
-    return Math.round((completedTasks / totalTasks) * 100);
   };
 
   useEffect(() => {
@@ -116,132 +80,7 @@ const StudentDetailPage: React.FC = () => {
     fetchData();
   }, [studentId]);
   
-  const handleTaskDescriptionChange = (day: string, taskIndex: number, value: string) => {
-    setWeeklyProgram(prev => {
-        const newProgram = {...prev};
-        const dayTasks = [...(newProgram[day] || [])];
-        const updatedTask = { ...dayTasks[taskIndex], description: value };
-        dayTasks[taskIndex] = updatedTask;
-        newProgram[day] = dayTasks;
-        return newProgram;
-    });
-  };
 
-  const handleAddTask = (day: string) => {
-    setWeeklyProgram(prev => {
-        const newProgram = {...prev};
-        const dayTasks = prev[day] ? [...prev[day]] : [];
-        dayTasks.push({
-            id: `${day.toLowerCase().slice(0,3)}-${Date.now()}`,
-            description: '',
-            isCompleted: false
-        });
-        newProgram[day] = dayTasks;
-        return newProgram;
-    });
-  };
-
-  const handleDeleteTask = (day: string, taskIndex: number) => {
-    setWeeklyProgram(prev => {
-        const newProgram = {...prev};
-        const dayTasks = prev[day] ? [...prev[day]] : [];
-        dayTasks.splice(taskIndex, 1);
-        newProgram[day] = dayTasks;
-        return newProgram;
-    });
-  };
-
-  const handleSaveProgram = async () => {
-    if (!studentId || !programTitle.trim()) {
-        alert("Lütfen program için bir başlık girin.");
-        return;
-    }
-    setIsSaving(true);
-    setSaveSuccess(false);
-
-    const newProgram: TitledWeeklyProgram = {
-        id: `program-${Date.now()}`,
-        title: programTitle,
-        createdAt: new Date().toISOString(),
-        program: weeklyProgram,
-    };
-    
-    const existingPrograms: TitledWeeklyProgram[] = student?.programs ? JSON.parse(student.programs) : [];
-    const updatedPrograms = [newProgram, ...existingPrograms];
-    const programsToSave = JSON.stringify(updatedPrograms);
-
-    await supabaseApi.updateStudentPrograms(studentId, programsToSave);
-    
-    setStudent(prev => prev ? {...prev, programs: programsToSave} : null);
-
-    // Reset the form
-    setWeeklyProgram(getInitialProgram());
-    setProgramTitle('');
-    setOpenDay('Pazartesi');
-
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
-  
-  const handleDuplicateProgram = (programToDuplicate: TitledWeeklyProgram) => {
-      const newProgramData: WeeklyProgram = {};
-      Object.entries(programToDuplicate.program).forEach(([day, tasks]) => {
-          newProgramData[day] = (tasks as ProgramTask[]).map((task: ProgramTask) => ({
-              ...task,
-              id: `${day.toLowerCase().slice(0,3)}-${Date.now()}-${Math.random()}`
-          }));
-      });
-  
-      setProgramTitle(`Kopya: ${programToDuplicate.title}`);
-      setWeeklyProgram(newProgramData);
-      setActiveTab('program');
-      setOpenDay(DAYS_OF_WEEK[0]);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Drag and Drop handlers
-  const handleDragStart = (e: React.DragEvent, fromDay: string, fromIndex: number) => {
-      dragItem.current = { fromDay, fromIndex };
-      setTimeout(() => setDragging(true), 0);
-  };
-
-  const handleDragEnter = (e: React.DragEvent, toDay: string, toIndex: number) => {
-      if(dragItem.current?.fromDay === toDay && dragItem.current?.fromIndex === toIndex) return;
-      dragOverItem.current = { toDay, toIndex };
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-      if (!dragItem.current || !dragOverItem.current) return;
-      
-      const { fromDay, fromIndex } = dragItem.current;
-      const { toDay, toIndex } = dragOverItem.current;
-      
-      const newProgram = JSON.parse(JSON.stringify(weeklyProgram));
-      const draggedTask = newProgram[fromDay].splice(fromIndex, 1)[0];
-      
-      if (!newProgram[toDay]) {
-          newProgram[toDay] = [];
-      }
-
-      if (fromDay === toDay) {
-         newProgram[toDay].splice(toIndex, 0, draggedTask);
-      } else {
-         newProgram[toDay].splice(toIndex, 0, draggedTask);
-      }
-
-      setWeeklyProgram(newProgram);
-      
-      dragItem.current = null;
-      dragOverItem.current = null;
-      setDragging(false);
-  };
-  
-  const handleDragEnd = () => {
-    dragItem.current = null;
-    dragOverItem.current = null;
-    setDragging(false);
-  };
 
   // Homework functions
   const handleDateSelect = (date: Date) => {
@@ -340,8 +179,7 @@ const StudentDetailPage: React.FC = () => {
     </button>
   );
 
-  const studentPrograms: TitledWeeklyProgram[] = student.programs ? JSON.parse(student.programs).sort((a: TitledWeeklyProgram, b: TitledWeeklyProgram) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [];
-  const hasProgramTasks = studentPrograms.length > 0;
+
 
   const chartTextColor = theme === 'dark' ? '#94a3b8' : '#64748b';
 
@@ -381,10 +219,6 @@ const StudentDetailPage: React.FC = () => {
             <TabButton tabId="program">
               <span className="hidden sm:inline">📅 Ödev Takvimi</span>
               <span className="sm:hidden">Ödevler</span>
-            </TabButton>
-            <TabButton tabId="odevler">
-              <span className="hidden sm:inline">📋 Program Oluştur</span>
-              <span className="sm:hidden">Program</span>
             </TabButton>
             <TabButton tabId="soru-analizi">
               <span className="hidden sm:inline">Soru Analizi</span>
@@ -520,181 +354,6 @@ const StudentDetailPage: React.FC = () => {
                       )}
                     </Card>
                   </div>
-                </div>
-            )}
-
-             {activeTab === 'odevler' && (
-                <div className="space-y-6">
-                  <Card title="Yeni Haftalık Program Oluştur">
-                      <div className="mb-6">
-                          <label htmlFor="programTitle" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Program Başlığı</label>
-                          <input
-                              type="text"
-                              id="programTitle"
-                              value={programTitle}
-                              onChange={(e) => setProgramTitle(e.target.value)}
-                              placeholder="Örn: 2. Hafta - Paragraf Kampı"
-                              className="block w-full rounded-lg border-[var(--border-color-light)] shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm p-2.5 bg-[var(--bg-input)] text-[var(--text-primary)]"
-                          />
-                      </div>
-                      <div className="space-y-2">
-                          {DAYS_OF_WEEK.map(day => {
-                              const isOpen = openDay === day;
-                              const tasksForDay = weeklyProgram[day] || [];
-                              return (
-                                  <div key={day} className="border border-[var(--border-color-light)] rounded-lg overflow-hidden transition-all duration-300 bg-[var(--bg-card)]">
-                                      <button
-                                          onClick={() => setOpenDay(isOpen ? null : day)}
-                                          className="w-full flex justify-between items-center p-4 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800/70 transition-colors"
-                                      >
-                                          <div className="flex items-center space-x-3">
-                                              <span className="font-bold text-[var(--text-primary)] text-lg">{day}</span>
-                                              {tasksForDay.length > 0 && (
-                                                  <span className="bg-violet-200 text-violet-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{tasksForDay.length} görev</span>
-                                              )}
-                                          </div>
-                                          <svg className={`h-6 w-6 text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                          </svg>
-                                      </button>
-                                      {isOpen && (
-                                          <div 
-                                              className="p-4 bg-[var(--bg-input)] space-y-3"
-                                              onDrop={handleDrop}
-                                              onDragOver={(e) => e.preventDefault()}
-                                          >
-                                              {tasksForDay.map((task, index) => (
-                                                  <div 
-                                                      key={task.id} 
-                                                      className={`flex items-center space-x-2 transition-opacity ${dragging && dragItem.current?.fromIndex === index && dragItem.current?.fromDay === day ? 'opacity-30' : 'opacity-100'}`}
-                                                      draggable
-                                                      onDragStart={(e) => handleDragStart(e, day, index)}
-                                                      onDragEnter={(e) => handleDragEnter(e, day, index)}
-                                                      onDragEnd={handleDragEnd}
-                                                      onDragOver={(e) => e.preventDefault()}
-                                                  >
-                                                      <span className="cursor-grab text-slate-400 hover:text-slate-600" title="Sıralamak için sürükle">
-                                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                                                      </span>
-                                                      <input
-                                                          type="text"
-                                                          className="flex-grow p-2 border border-[var(--border-color-light)] rounded-lg bg-[var(--bg-input)] focus:ring-2 focus:ring-violet-500 focus:outline-none transition text-[var(--text-primary)]"
-                                                          placeholder="Görev açıklaması..."
-                                                          value={task.description}
-                                                          onChange={(e) => handleTaskDescriptionChange(day, index, e.target.value)}
-                                                      />
-                                                      <button onClick={() => handleDeleteTask(day, index)} className="p-2 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-full transition-colors flex-shrink-0">
-                                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clipRule="evenodd" />
-                                                          </svg>
-                                                      </button>
-                                                  </div>
-                                              ))}
-                                              {dragOverItem.current && dragOverItem.current.toDay === day && dragOverItem.current.toIndex === tasksForDay.length && (
-                                                  <div className="h-10 bg-violet-100 dark:bg-violet-900/30 rounded-lg border-2 border-dashed border-violet-300 dark:border-violet-700"></div>
-                                              )}
-                                              <button onClick={() => handleAddTask(day)} className="mt-2 text-sm text-violet-600 hover:text-violet-800 dark:hover:text-violet-400 font-semibold transition-colors py-1 px-2 rounded hover:bg-violet-100/70 dark:hover:bg-violet-900/30">
-                                                  + Görev Ekle
-                                              </button>
-                                          </div>
-                                      )}
-                                  </div>
-                              );
-                          })}
-                      </div>
-                      <button 
-                          onClick={handleSaveProgram}
-                          disabled={isSaving}
-                          className={`mt-6 w-full text-white py-2.5 rounded-lg font-semibold transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 ${
-                              saveSuccess ? 'bg-gradient-to-r from-emerald-500 to-green-600' : 'bg-gradient-to-r from-violet-600 to-fuchsia-500'
-                          } disabled:bg-slate-400`}
-                      >
-                          {isSaving ? 'Kaydediliyor...' : (saveSuccess ? 'Program Eklendi!' : 'Yeni Programı Ekle')}
-                      </button>
-                  </Card>
-
-                  <Card title="Haftalık Program Takibi">
-                      {hasProgramTasks ? (
-                         <div className="space-y-4">
-                          {studentPrograms.map(p => {
-                              const isOpen = openTrackingProgramId === p.id;
-                              const completionPercentage = calculateProgramCompletion(p.program);
-                              return (
-                                 <div key={p.id} className="border border-[var(--border-color-light)] rounded-lg overflow-hidden transition-all duration-300 bg-[var(--bg-card)] shadow-sm">
-                                      <button
-                                          onClick={() => setOpenTrackingProgramId(isOpen ? null : p.id)}
-                                          className="w-full flex justify-between items-center p-4 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800/70 transition-colors"
-                                      >
-                                          <div className='text-left w-full mr-4'>
-                                              <div className="flex justify-between items-center gap-2">
-                                                  <h4 className="font-bold text-[var(--text-primary)] text-lg flex-grow">{p.title}</h4>
-                                                  <button 
-                                                    onClick={(e) => { e.stopPropagation(); handleDuplicateProgram(p); }} 
-                                                    className="p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors flex-shrink-0"
-                                                    title="Bu Programı Kopyala"
-                                                  >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                      <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
-                                                      <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h6a2 2 0 00-2-2H5z" />
-                                                    </svg>
-                                                  </button>
-                                                  <span className={`text-sm font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
-                                                      completionPercentage === 100 
-                                                      ? 'bg-emerald-200 text-emerald-800' 
-                                                      : 'bg-violet-200 text-violet-800'
-                                                  }`}>
-                                                      %{completionPercentage}
-                                                  </span>
-                                              </div>
-                                              <p className="text-xs text-[var(--text-secondary)] mt-1">Oluşturulma: {new Date(p.createdAt).toLocaleDateString()}</p>
-                                              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
-                                                  <div 
-                                                      className={`h-2 rounded-full transition-all duration-500 ${
-                                                          completionPercentage === 100 
-                                                          ? 'bg-emerald-500' 
-                                                          : 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                                                      }`} 
-                                                      style={{ width: `${completionPercentage}%` }}
-                                                  ></div>
-                                              </div>
-                                          </div>
-                                          <svg className={`h-6 w-6 text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                          </svg>
-                                      </button>
-                                      {isOpen && (
-                                          <div className="p-4 bg-[var(--bg-input)] space-y-4">
-                                              {DAYS_OF_WEEK.map(day => {
-                                                  const tasks = p.program[day] || [];
-                                                  if (tasks.length === 0) return null;
-                                                  return (
-                                                      <div key={day}>
-                                                          <h4 className="font-bold text-md text-[var(--text-secondary)]">{day}</h4>
-                                                          <ul className="mt-2 space-y-2">
-                                                              {tasks.map((task: ProgramTask) => (
-                                                                  <li key={task.id} className={`flex items-center p-2 rounded-md text-sm transition-colors ${
-                                                                      task.isCompleted ? 'bg-emerald-100/70 dark:bg-emerald-900/40 text-slate-500 dark:text-slate-400 line-through' : 'bg-slate-100/70 dark:bg-slate-700/50 text-[var(--text-primary)]'
-                                                                    }`}>
-                                                                      <svg className={`w-5 h-5 mr-3 flex-shrink-0 ${task.isCompleted ? 'text-emerald-500' : 'text-slate-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                                      </svg>
-                                                                      <span>{task.description}</span>
-                                                                  </li>
-                                                              ))}
-                                                          </ul>
-                                                      </div>
-                                                  )
-                                              })}
-                                          </div>
-                                      )}
-                                  </div>
-                              )
-                          })}
-                         </div>
-                      ) : (
-                          <p className="text-[var(--text-secondary)] text-center py-4">Öğrenciye atanmış program bulunmuyor.</p>
-                      )}
-                  </Card>
                 </div>
             )}
 

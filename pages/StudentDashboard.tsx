@@ -4,7 +4,7 @@ import { AuthContext } from '../App';
 import Header from '../components/common/Header';
 import Card from '../components/common/Card';
 import Spinner from '../components/common/Spinner';
-import { DailyLog, LGSSubject, ProgramTask, TitledWeeklyProgram, WeeklyProgram, TrialExamResult, TrialExamSubjectDetail, Coach, LeaderboardEntry, Homework } from '../types';
+import { DailyLog, LGSSubject, TrialExamResult, TrialExamSubjectDetail, Coach, LeaderboardEntry, Homework } from '../types';
 import supabaseApi from '../services/supabaseApi';
 import { LGS_SUBJECTS } from '../constants';
 import MotivationalModal from '../components/student/MotivationalModal';
@@ -13,7 +13,7 @@ import Calendar from '../components/common/Calendar';
 
 const StudentDashboard: React.FC = () => {
   const auth = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState('program');
+  const [activeTab, setActiveTab] = useState('homework');
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -92,14 +92,12 @@ const StudentDashboard: React.FC = () => {
       <Header user={auth.user} />
       <main className="max-w-4xl mx-auto py-4 sm:py-8 px-2 sm:px-4 lg:px-8">
         <div className="flex space-x-1 sm:space-x-2 md:space-x-4 mb-6 sm:mb-8 p-1 sm:p-2 bg-[var(--bg-tab-container)] rounded-xl overflow-x-auto">
-          <TabButton tabId="program">Programlarım</TabButton>
           <TabButton tabId="homework">📝 Ödevlerim</TabButton>
           <TabButton tabId="dailyLog">Günlük Takip</TabButton>
           <TabButton tabId="examLog">Deneme Sonuçları</TabButton>
           <TabButton tabId="leaderboard">🏆 Liderlik</TabButton>
         </div>
         <div>
-          {activeTab === 'program' && <ProgramPanel />}
           {activeTab === 'homework' && <HomeworkPanel />}
           {activeTab === 'dailyLog' && <DailyLogPanel />}
           {activeTab === 'examLog' && <ExamLogPanel />}
@@ -110,181 +108,6 @@ const StudentDashboard: React.FC = () => {
   );
 };
 
-const ProgramPanel: React.FC = () => {
-    const auth = useContext(AuthContext);
-    const [programs, setPrograms] = useState<TitledWeeklyProgram[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [openProgramId, setOpenProgramId] = useState<string | null>(null);
-    const [justCompletedTaskId, setJustCompletedTaskId] = useState<string | null>(null);
-
-    const calculateProgramCompletion = (program: WeeklyProgram): number => {
-      let totalTasks = 0;
-      let completedTasks = 0;
-  
-      Object.values(program).forEach(dayTasks => {
-          if (Array.isArray(dayTasks)) {
-              dayTasks.forEach(task => {
-                  totalTasks++;
-                  if (task.isCompleted) {
-                      completedTasks++;
-                  }
-              });
-          }
-      });
-  
-      if (totalTasks === 0) {
-          return 0;
-      }
-  
-      return Math.round((completedTasks / totalTasks) * 100);
-    };
-
-    useEffect(() => {
-        const fetchStudent = async () => {
-            if (auth?.user) {
-                setLoading(true);
-                const studentData = await supabaseApi.getStudentById(auth.user.id);
-                if (studentData?.programs) {
-                    try {
-                        const parsedPrograms: TitledWeeklyProgram[] = JSON.parse(studentData.programs);
-                        setPrograms(parsedPrograms.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-                    } catch (e) {
-                        console.error("Failed to parse programs JSON", e);
-                        setPrograms([]);
-                    }
-                } else {
-                    setPrograms([]);
-                }
-                setLoading(false);
-            }
-        };
-        fetchStudent();
-    }, [auth?.user]);
-    
-    const handleToggleCompletion = async (programId: string, day: string, taskId: string) => {
-        if (!auth?.user) return;
-
-        const programIndex = programs.findIndex(p => p.id === programId);
-        if (programIndex === -1) return;
-        
-        const updatedPrograms = JSON.parse(JSON.stringify(programs)); // Deep copy
-        const programToUpdate = updatedPrograms[programIndex];
-        const task = programToUpdate.program[day]?.find((t: ProgramTask) => t.id === taskId);
-        
-        if (task) {
-            if (!task.isCompleted) { // Task is about to be completed
-                setJustCompletedTaskId(taskId);
-                setTimeout(() => setJustCompletedTaskId(null), 500); // Animation duration is 500ms
-            }
-            task.isCompleted = !task.isCompleted;
-            setPrograms(updatedPrograms); // Optimistic update
-            try {
-                await supabaseApi.updateStudentPrograms(auth.user.id, JSON.stringify(updatedPrograms));
-            } catch (error) {
-                console.error("Failed to update programs:", error);
-                const studentData = await supabaseApi.getStudentById(auth.user.id);
-                if (studentData?.programs) setPrograms(JSON.parse(studentData.programs));
-                alert("Program güncellenirken bir hata oluştu.");
-            }
-        }
-    };
-
-    const renderPrograms = () => {
-        if (!programs || programs.length === 0) {
-            return <p className="text-[var(--text-secondary)] text-center py-4">Koçun tarafından henüz bir program oluşturulmadı.</p>;
-        }
-
-        return (
-            <div className="space-y-4">
-                {programs.map((p) => {
-                    const isOpen = openProgramId === p.id;
-                    const completionPercentage = calculateProgramCompletion(p.program);
-                    return (
-                        <div key={p.id} className="border border-[var(--border-color-light)] rounded-lg overflow-hidden transition-all duration-300 bg-[var(--bg-card)] shadow-sm">
-                            <button
-                                onClick={() => setOpenProgramId(isOpen ? null : p.id)}
-                                className="w-full flex justify-between items-center p-4 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/90 dark:hover:bg-slate-800/70 transition-colors"
-                                aria-expanded={isOpen}
-                                aria-controls={`program-content-${p.id}`}
-                            >
-                               <div className="text-left w-full mr-4">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="font-bold text-[var(--text-primary)] text-lg">{p.title}</h4>
-                                        <span className={`text-sm font-bold px-2.5 py-1 rounded-full ${
-                                            completionPercentage === 100 
-                                            ? 'bg-emerald-200 text-emerald-800' 
-                                            : 'bg-violet-200 text-violet-800'
-                                        }`}>
-                                            %{completionPercentage}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-1">Oluşturulma: {new Date(p.createdAt).toLocaleDateString()}</p>
-                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
-                                        <div 
-                                            className={`h-2 rounded-full transition-all duration-500 ${
-                                                completionPercentage === 100 
-                                                ? 'bg-emerald-500' 
-                                                : 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                                            }`} 
-                                            style={{ width: `${completionPercentage}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                                <svg className={`h-6 w-6 text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            {isOpen && (
-                                <div id={`program-content-${p.id}`} className="p-4 bg-[var(--bg-input)] space-y-6">
-                                    {Object.entries(p.program).filter(([, tasks]) => Array.isArray(tasks) && tasks.length > 0).map(([day, tasks]) => (
-                                        <div key={day} className="p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg border-l-4 border-violet-500 shadow-sm">
-                                            <h4 className="font-bold text-[var(--text-primary)] text-lg mb-3">{day}</h4>
-                                            <div className="space-y-3">
-                                                {(tasks as ProgramTask[]).map((task: ProgramTask) => (
-                                                    <div 
-                                                      key={task.id} 
-                                                      className={`flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 ${
-                                                        task.isCompleted ? 'bg-emerald-100/70 dark:bg-emerald-900/40' : 'bg-slate-100/70 dark:bg-slate-700/50 hover:bg-slate-200/60 dark:hover:bg-slate-700/80'
-                                                      } ${justCompletedTaskId === task.id ? 'animate-task-complete' : ''}`}>
-                                                        <input
-                                                            id={`task-${task.id}`}
-                                                            type="checkbox"
-                                                            className={`h-5 w-5 rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer transition-colors ${
-                                                                task.isCompleted
-                                                                    ? 'text-emerald-600 focus:ring-emerald-500'
-                                                                    : 'text-violet-600 focus:ring-violet-500'
-                                                            }`}
-                                                            checked={task.isCompleted}
-                                                            onChange={() => handleToggleCompletion(p.id, day, task.id)}
-                                                        />
-                                                        <label
-                                                            htmlFor={`task-${task.id}`}
-                                                            className={`flex-grow cursor-pointer transition-all ${
-                                                                task.isCompleted ? 'line-through text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200'
-                                                            }`}
-                                                        >
-                                                            {task.description}
-                                                        </label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    return (
-        <Card title="Haftalık Programlarım">
-            {loading ? <Spinner /> : renderPrograms()}
-        </Card>
-    );
-};
 
 const DailyLogPanel = () => {
     const auth = useContext(AuthContext);
