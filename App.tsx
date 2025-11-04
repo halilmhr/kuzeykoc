@@ -30,16 +30,20 @@ const App: React.FC = () => {
         const parsedUser = JSON.parse(savedUser) as User;
         setUser(parsedUser);
         
-        // Request notification permission if user is a coach
+        // Request notification permission if user is a coach (only on desktop)
         if (parsedUser.role === UserRole.COACH) {
           setTimeout(() => {
-            NotificationService.requestPermission().then(granted => {
-              if (granted) {
-                console.log('✅ Bildirim izni verildi');
-              } else {
-                console.log('❌ Bildirim izni reddedildi');
-              }
-            });
+            if (!NotificationService.isMobile()) {
+              NotificationService.requestPermission().then(granted => {
+                if (granted) {
+                  console.log('✅ Bildirim izni verildi');
+                } else {
+                  console.log('❌ Bildirim izni reddedildi');
+                }
+              });
+            } else {
+              console.log('📱 Mobil cihazda in-app bildirim kullanılacak');
+            }
           }, 2000); // 2 saniye bekle
         }
       } catch (error) {
@@ -58,14 +62,18 @@ const App: React.FC = () => {
         // Save user to localStorage
         localStorage.setItem('currentUser', JSON.stringify(foundUser));
         
-        // Request notification permission if user is a coach
+        // Request notification permission if user is a coach (only on desktop)
         if (foundUser.role === UserRole.COACH) {
           setTimeout(() => {
-            NotificationService.requestPermission().then(granted => {
-              if (granted) {
-                console.log('✅ Bildirim izni verildi');
-              }
-            });
+            if (!NotificationService.isMobile()) {
+              NotificationService.requestPermission().then(granted => {
+                if (granted) {
+                  console.log('✅ Bildirim izni verildi');
+                }
+              });
+            } else {
+              console.log('📱 Mobil cihazda in-app bildirim kullanılacak');
+            }
           }, 1000);
         }
         
