@@ -414,6 +414,25 @@ const CoachDashboard: React.FC = () => {
     }
   };
 
+  const handleForceRefresh = async () => {
+    if (!auth?.user?.id) return;
+    
+    console.log('🔄 ZORLA YENİLEME başlatıldı...', auth.user.id);
+    
+    try {
+      const freshNotifications = await getUnreadNotifications(auth.user.id);
+      setNotifications(freshNotifications);
+      setUnreadCount(freshNotifications.length);
+      
+      alert(`🔄 Yenileme tamamlandı!\n\n${freshNotifications.length} bildirim bulundu.\n\nReal-time subscription durumu kontrol ediliyor...`);
+      
+      console.log('📡 Notifications refreshed:', freshNotifications);
+    } catch (error) {
+      console.error('❌ Refresh error:', error);
+      alert('❌ Yenileme hatası: ' + error);
+    }
+  };
+
   return (
     <>
       <Header user={auth.user} />
@@ -434,8 +453,14 @@ const CoachDashboard: React.FC = () => {
           >
             📊 İstatistikleri Göster
           </button>
+          <button
+            onClick={handleForceRefresh}
+            className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
+          >
+            🔄 Zorla Yenile
+          </button>
           <div className="text-sm text-gray-600">
-            Bildirimler: {notifications.length} | Okunmamış: {unreadCount}
+            Bildirimler: {notifications.length} | Okunmamış: {unreadCount} | Koç ID: {auth.user.id?.substring(0, 8)}...
           </div>
         </div>
       </div>
