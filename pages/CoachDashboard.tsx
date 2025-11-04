@@ -216,25 +216,31 @@ const CoachDashboard: React.FC = () => {
                 data: newNotification.data
               });
               
-              // Method 2: Direct Notification API (backup)
-              if (Notification.permission === 'granted') {
-                new Notification(newNotification.title, {
-                  body: newNotification.message,
-                  icon: '/favicon.ico',
-                  badge: '/favicon.ico',
-                  requireInteraction: true,
-                  silent: true,
-                  tag: 'realtime-' + newNotification.id
-                });
-              }
-              
-              // Method 3: Service Worker (backup)
+              // Method 2: Service Worker (Android uyumlu)
               if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                console.log('📱 Service Worker bildirimi gönderiliyor...');
                 navigator.serviceWorker.controller.postMessage({
                   type: 'SHOW_NOTIFICATION',
                   title: newNotification.title,
                   body: newNotification.message,
                   tag: 'realtime-sw-' + newNotification.id
+                });
+              }
+              
+              // Method 3: ServiceWorkerRegistration (Android için)
+              if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+                navigator.serviceWorker.ready.then((registration) => {
+                  console.log('🤖 Android uyumlu ServiceWorkerRegistration bildirimi...');
+                  return registration.showNotification(newNotification.title, {
+                    body: newNotification.message,
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    requireInteraction: true,
+                    silent: true,
+                    tag: 'android-realtime-' + newNotification.id
+                  });
+                }).catch(error => {
+                  console.error('❌ Android bildirim hatası:', error);
                 });
               }
               
@@ -468,29 +474,57 @@ const CoachDashboard: React.FC = () => {
       const swRegistered = 'serviceWorker' in navigator && navigator.serviceWorker.controller;
       console.log('🔧 Service Worker aktif:', swRegistered);
       
-      // Manual test bildirimi
+      // Manual test bildirimi - ANDROID UYUMLU
       if (Notification.permission === 'granted') {
-        console.log('✅ Manual test bildirimi gösteriliyor...');
+        console.log('✅ Manual test bildirimi gösteriliyor (Android uyumlu)...');
         
-        // Test 1: Direct Notification
-        const notification = new Notification('🧪 MANUAL TEST BİLDİRİM', {
-          body: 'Bu manuel test bildirimidir. Çalışıyorsa sistem OK!',
-          icon: '/favicon.ico',
-          requireInteraction: true,
-          silent: true
-        });
-        
-        console.log('📱 Direct notification oluşturuldu:', notification);
-        
-        // Test 2: Service Worker bildirimi
-        if (navigator.serviceWorker.controller) {
-          console.log('🔧 Service Worker test bildirimi gönderiliyor...');
-          navigator.serviceWorker.controller.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            title: '🔧 SERVICE WORKER TEST',
-            body: 'Service Worker üzerinden test bildirimi',
-            tag: 'sw-test'
-          });
+        // Android için SADECE Service Worker kullan
+        if ('serviceWorker' in navigator) {
+          console.log('🤖 Android tespit edildi - Service Worker bildirimi kullanılıyor...');
+          
+          // Service Worker registration üzerinden bildirim göster
+          if (navigator.serviceWorker.controller) {
+            console.log('🔧 Service Worker aktif - bildirim gönderiliyor...');
+            
+            // Test 1: Service Worker direct
+            navigator.serviceWorker.controller.postMessage({
+              type: 'SHOW_NOTIFICATION',
+              title: '� ANDROID TEST BİLDİRİM',
+              body: 'Android Chrome uyumlu Service Worker bildirimi!',
+              tag: 'android-test'
+            });
+            
+            // Test 2: Service Worker registration API
+            navigator.serviceWorker.ready.then((registration) => {
+              console.log('📱 ServiceWorkerRegistration.showNotification çalıştırılıyor...');
+              return registration.showNotification('🔧 ANDROID SW REGISTRATION TEST', {
+                body: 'ServiceWorkerRegistration API test bildirimi',
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                requireInteraction: true,
+                silent: true,
+                tag: 'android-sw-reg-test'
+              });
+            }).then(() => {
+              console.log('✅ Android bildirim başarıyla gönderildi!');
+            }).catch(error => {
+              console.error('❌ Android bildirim hatası:', error);
+            });
+            
+          } else {
+            console.log('⚠️ Service Worker controller yok - kayıt bekleniyor...');
+            // Service Worker'ı bekle
+            navigator.serviceWorker.ready.then((registration) => {
+              return registration.showNotification('⏳ SW HAZIR TEST', {
+                body: 'Service Worker hazır olduktan sonra bildirim',
+                icon: '/favicon.ico',
+                requireInteraction: true,
+                silent: true
+              });
+            });
+          }
+        } else {
+          console.log('❌ Service Worker desteklenmiyor');
         }
       } else {
         console.log('❌ Notification permission denied:', Notification.permission);
