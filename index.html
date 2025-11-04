@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HALİL HOCA'NIN ŞAMPİYONLARI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --primary: #8b5cf6; /* violet-500 */
+        --primary-dark: #c026d3; /* fuchsia-600 */
+        --secondary: #38bdf8; /* sky-400 */
+        --accent-green: #10b981; /* emerald-500 */
+        --accent-yellow: #f59e0b; /* amber-500 */
+        --accent-red: #f43f5e; /* rose-500 */
+        
+        /* Light Theme */
+        --bg-start: #f1f5f9; /* slate-100 */
+        --bg-end: #e2e8f0; /* slate-200 */
+        --bg-card: rgba(255, 255, 255, 0.7);
+        --bg-header: rgba(255, 255, 255, 0.9);
+        --bg-input: rgba(255, 255, 255, 0.8);
+        --bg-tab-container: rgba(226, 232, 240, 0.5);
+        --bg-tab-inactive: rgba(255, 255, 255, 0.6);
+        --bg-hover: rgba(237, 233, 254, 0.7); /* violet-100/70 */
+        --text-primary: #1e293b; /* slate-800 */
+        --text-secondary: #64748b; /* slate-500 */
+        --border-color: rgba(255, 255, 255, 0.3);
+        --border-color-light: #e2e8f0; /* slate-200 */
+      }
+
+      html[data-theme='dark'] {
+        --bg-start: #0f172a; /* slate-900 */
+        --bg-end: #1e293b; /* slate-800 */
+        --bg-card: rgba(30, 41, 59, 0.7);
+        --bg-header: rgba(15, 23, 42, 0.85);
+        --bg-input: rgba(51, 65, 85, 0.8);
+        --bg-tab-container: rgba(51, 65, 85, 0.5);
+        --bg-tab-inactive: rgba(51, 65, 85, 0.6);
+        --bg-hover: rgba(51, 65, 85, 0.7); /* slate-700/70 */
+        --text-primary: #f1f5f9; /* slate-100 */
+        --text-secondary: #94a3b8; /* slate-400 */
+        --border-color: rgba(100, 116, 139, 0.3);
+        --border-color-light: #334155; /* slate-700 */
+      }
+
+      body {
+        font-family: 'Poppins', sans-serif;
+        background-color: var(--bg-start);
+        background-image: linear-gradient(160deg, var(--bg-start) 0%, var(--bg-end) 100%);
+        color: var(--text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+      }
+      @keyframes slide-up {
+          from { transform: translateY(20px) scale(0.95); opacity: 0; }
+          to { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      @keyframes task-completed-pop {
+        0% { transform: scale(1); box-shadow: 0 0 0 rgba(16, 185, 129, 0); }
+        50% { transform: scale(1.03); box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
+        100% { transform: scale(1); box-shadow: 0 0 0 rgba(16, 185, 129, 0); }
+      }
+      @keyframes pulse-once {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+      }
+      .animate-fade-in {
+          animation: fade-in 0.3s ease-out forwards;
+      }
+      .animate-slide-up {
+          animation: slide-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      .animate-task-complete {
+          animation: task-completed-pop 0.5s ease-out;
+      }
+      .animate-pulse-once {
+          animation: pulse-once 0.6s ease-out;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.5",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
