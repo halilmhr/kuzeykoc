@@ -213,7 +213,9 @@ const CoachDashboard: React.FC = () => {
   // Initialize notification service for coaches
   useEffect(() => {
     if (auth?.user && auth.user.role === 'coach') {
-      NotificationService.initialize();
+      NotificationService.initialize().then(() => {
+        console.log('🔔 Koç için bildirim sistemi hazır');
+      });
     }
   }, [auth?.user]);
   

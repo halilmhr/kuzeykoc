@@ -46,14 +46,43 @@ export class NotificationService {
   } = {}) {
     console.log('🔔 Bildirim gönderiliyor:', title, options.body);
     
-    // Android için özel modal alert
-    if (this.isMobile()) {
-      this.showAndroidModal(title, options.body || '');
-      this.playNotificationSound();
-      return null;
+    // Service Worker ile persistent notification (Android için ideal)
+    if (this.serviceWorkerRegistration) {
+      try {
+        await this.serviceWorkerRegistration.showNotification(title, {
+          body: options.body || '',
+          icon: options.icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: options.tag || 'coach-notification',
+          requireInteraction: true, // Android'de bildirim ekranında kalır
+          silent: false,
+          vibrate: [300, 200, 300],
+          data: {
+            url: '/', // Tıklandığında ana sayfaya git
+            ...options.data
+          },
+          actions: [
+            {
+              action: 'open',
+              title: '📱 Uygulamayı Aç',
+              icon: '/favicon.ico'
+            },
+            {
+              action: 'close',
+              title: '✕ Kapat'
+            }
+          ]
+        });
+        
+        console.log('✅ Service Worker persistent notification gönderildi');
+        this.playNotificationSound();
+        return true;
+      } catch (error) {
+        console.error('❌ Service Worker notification failed:', error);
+      }
     }
 
-    // Desktop için normal notification
+    // Fallback: Normal notification (Desktop için)
     if (this.canSendNotifications()) {
       try {
         const notification = new Notification(title, {
@@ -64,9 +93,10 @@ export class NotificationService {
           requireInteraction: false
         });
 
+        // Desktop'ta 8 saniye sonra kapat
         setTimeout(() => {
           notification.close();
-        }, 5000);
+        }, 8000);
 
         console.log('✅ Desktop bildirim gönderildi');
         return notification;
@@ -79,7 +109,11 @@ export class NotificationService {
     return null;
   }
 
-  // Mobil kontrol
+  // Android kontrol (iOS için farklı davranış gerekebilir)
+  private static isAndroid(): boolean {
+    return /Android/i.test(navigator.userAgent);
+  }
+  
   private static isMobile(): boolean {
     return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
