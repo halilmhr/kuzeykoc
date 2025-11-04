@@ -513,3 +513,142 @@ export const getCoachLeaderboard = async (coachId: string) => {
     
     return data || [];
 }
+
+// Homework Functions
+export const getHomeworkByStudent = async (studentId: string) => {
+    const { data, error } = await supabase
+        .from('homework')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching homework by student:', error);
+        throw error;
+    }
+
+    // Map database fields to frontend interface
+    return data?.map(hw => ({
+        id: hw.id,
+        title: hw.title,
+        description: hw.description,
+        date: hw.date,
+        studentId: hw.student_id,
+        coachId: hw.coach_id,
+        isCompleted: hw.is_completed,
+        createdAt: hw.created_at
+    })) || [];
+};
+
+export const getHomeworkByCoach = async (coachId: string) => {
+    const { data, error } = await supabase
+        .from('homework')
+        .select('*')
+        .eq('coach_id', coachId)
+        .order('date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching homework by coach:', error);
+        throw error;
+    }
+
+    // Map database fields to frontend interface
+    return data?.map(hw => ({
+        id: hw.id,
+        title: hw.title,
+        description: hw.description,
+        date: hw.date,
+        studentId: hw.student_id,
+        coachId: hw.coach_id,
+        isCompleted: hw.is_completed,
+        createdAt: hw.created_at
+    })) || [];
+};
+
+export const addHomework = async (homeworkData: {
+    title: string;
+    description?: string;
+    date: string;
+    studentId: string;
+    coachId: string;
+}) => {
+    const { data, error } = await supabase
+        .from('homework')
+        .insert([{
+            title: homeworkData.title,
+            description: homeworkData.description,
+            date: homeworkData.date,
+            student_id: homeworkData.studentId,
+            coach_id: homeworkData.coachId
+        }])
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error adding homework:', error);
+        throw error;
+    }
+
+    // Map database fields to frontend interface
+    return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        date: data.date,
+        studentId: data.student_id,
+        coachId: data.coach_id,
+        isCompleted: data.is_completed,
+        createdAt: data.created_at
+    };
+};
+
+export const updateHomework = async (id: string, updates: {
+    title?: string;
+    description?: string;
+    date?: string;
+    isCompleted?: boolean;
+}) => {
+    const dbUpdates: any = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.isCompleted !== undefined) dbUpdates.is_completed = updates.isCompleted;
+
+    const { data, error } = await supabase
+        .from('homework')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error updating homework:', error);
+        throw error;
+    }
+
+    // Map database fields to frontend interface
+    return {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        date: data.date,
+        studentId: data.student_id,
+        coachId: data.coach_id,
+        isCompleted: data.is_completed,
+        createdAt: data.created_at
+    };
+};
+
+export const deleteHomework = async (id: string) => {
+    const { error } = await supabase
+        .from('homework')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error deleting homework:', error);
+        throw error;
+    }
+
+    return true;
+};

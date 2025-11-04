@@ -14,7 +14,12 @@ import {
     updateAssignmentStatus as supabaseUpdateAssignmentStatus,
     authenticateUser as supabaseAuthenticateUser,
     createCoach as supabaseCreateCoach,
-    getCoachLeaderboard as supabaseGetCoachLeaderboard
+    getCoachLeaderboard as supabaseGetCoachLeaderboard,
+    getHomeworkByStudent as supabaseGetHomeworkByStudent,
+    getHomeworkByCoach as supabaseGetHomeworkByCoach,
+    addHomework as supabaseAddHomework,
+    updateHomework as supabaseUpdateHomework,
+    deleteHomework as supabaseDeleteHomework
 } from './supabaseClient';
 import { User, UserRole, Student, Coach, Book, Assignment, DailyLog, TrialExamResult, Homework } from '../types';
 
@@ -174,50 +179,50 @@ const supabaseApi = {
     }
   },
 
-  // Homework
+  // Homework - Real Supabase Implementation
   getHomeworkByStudent: async (studentId: string) => {
-    // Mock implementation - localStorage kullanarak ödevleri saklayalım
-    const allHomework = JSON.parse(localStorage.getItem('homework') || '[]');
-    return Promise.resolve(allHomework.filter((hw: any) => hw.studentId === studentId));
+    try {
+      return await supabaseGetHomeworkByStudent(studentId);
+    } catch (error) {
+      console.error('Error fetching homework by student:', error);
+      return [];
+    }
   },
 
   getHomeworkByCoach: async (coachId: string) => {
-    // Mock implementation - localStorage kullanarak ödevleri saklayalım
-    const allHomework = JSON.parse(localStorage.getItem('homework') || '[]');
-    return Promise.resolve(allHomework.filter((hw: any) => hw.coachId === coachId));
+    try {
+      return await supabaseGetHomeworkByCoach(coachId);
+    } catch (error) {
+      console.error('Error fetching homework by coach:', error);
+      return [];
+    }
   },
 
   addHomework: async (homework: any) => {
-    // Mock implementation - localStorage'a kaydet
-    const allHomework = JSON.parse(localStorage.getItem('homework') || '[]');
-    const newHomework = {
-      id: Date.now().toString(),
-      ...homework,
-      createdAt: new Date().toISOString()
-    };
-    allHomework.push(newHomework);
-    localStorage.setItem('homework', JSON.stringify(allHomework));
-    return Promise.resolve(newHomework);
+    try {
+      return await supabaseAddHomework(homework);
+    } catch (error) {
+      console.error('Error adding homework:', error);
+      return null;
+    }
   },
 
   updateHomework: async (id: string, updates: any) => {
-    // Mock implementation - localStorage'dan güncelle
-    const allHomework = JSON.parse(localStorage.getItem('homework') || '[]');
-    const index = allHomework.findIndex((hw: any) => hw.id === id);
-    if (index !== -1) {
-      allHomework[index] = { ...allHomework[index], ...updates };
-      localStorage.setItem('homework', JSON.stringify(allHomework));
-      return Promise.resolve(allHomework[index]);
+    try {
+      return await supabaseUpdateHomework(id, updates);
+    } catch (error) {
+      console.error('Error updating homework:', error);
+      return null;
     }
-    return Promise.resolve(null);
   },
 
   deleteHomework: async (id: string) => {
-    // Mock implementation - localStorage'dan sil
-    const allHomework = JSON.parse(localStorage.getItem('homework') || '[]');
-    const filteredHomework = allHomework.filter((hw: any) => hw.id !== id);
-    localStorage.setItem('homework', JSON.stringify(filteredHomework));
-    return Promise.resolve(true);
+    try {
+      return await supabaseDeleteHomework(id);
+    } catch (error) {
+      console.error('Error deleting homework:', error);
+      return false;
+    }
   },
 };
 
