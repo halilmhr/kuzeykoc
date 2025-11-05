@@ -209,12 +209,12 @@ function startBackgroundNotificationCheck() {
   // Check immediately
   checkForNewNotifications();
   
-  // Check every 30 seconds, more frequent when app is hidden
+  // Android optimized: Check every 10 seconds
   backgroundTimer = setInterval(() => {
-    const checkInterval = isAppVisible ? 30000 : 15000; // 15 seconds when hidden
-    console.log(`🔍 Background check for new notifications (app ${isAppVisible ? 'visible' : 'hidden'})`);
+    const checkInterval = isAppVisible ? 10000 : 5000; // 5 seconds when hidden
+    console.log(`🤖 Android Background check (app ${isAppVisible ? 'visible' : 'hidden'})`);
     checkForNewNotifications();
-  }, 15000); // Check every 15 seconds
+  }, 10000); // Check every 10 seconds for Android
 }
 
 function stopBackgroundNotificationCheck() {

@@ -280,7 +280,7 @@ const CoachDashboard: React.FC = () => {
           } catch (pollError) {
             console.error('Polling error:', pollError);
           }
-        }, 10000); // 10 saniye fallback
+        }, 5000); // 5 saniye fallback (Android için optimize)
         
         return () => clearInterval(fallbackInterval);
       }
@@ -335,13 +335,27 @@ const CoachDashboard: React.FC = () => {
           });
         }
 
-        // Visibility API - inform service worker about page visibility
+        // Visibility API - Android aggressive mode
         const handleVisibilityChange = () => {
           const isVisible = !document.hidden;
+          console.log(`👁️ Android Visibility değişti: ${isVisible ? 'görünür' : 'gizli'}`);
+          
           if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({
               type: 'VISIBILITY_CHANGE',
               isVisible: isVisible
+            });
+          }
+          
+          // Android için: Sayfa gizliyken de bildirim kontrol et
+          if (!isVisible) {
+            console.log('🤖 Android: Sayfa gizli - aggressive notification check');
+            getUnreadNotifications(auth.user.id).then(freshNotifications => {
+              if (freshNotifications.length > notifications.length) {
+                setNotifications(freshNotifications);
+                setUnreadCount(freshNotifications.length);
+                console.log('📱 Android: Gizliyken yeni bildirim bulundu!');
+              }
             });
           }
         };
