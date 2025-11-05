@@ -22,31 +22,45 @@ self.addEventListener('periodicsync', function(event) {
 // Check for notifications in background
 async function checkForNewNotifications() {
   try {
-    console.log('🔍 Background notification check başladı...');
+    console.log('🔍 ===== BACKGROUND NOTIFICATION CHECK BAŞLADI =====');
+    const startTime = Date.now();
     
     // Get stored coach data
     const cache = await caches.open('coach-cache');
+    console.log('📦 Cache açıldı');
+    
     const coachData = await cache.match('/coach-data');
     
     if (!coachData) {
-      console.log('❌ Cache\'de koç verisi yok');
+      console.log('❌ Cache\'de koç verisi YOK - Background sync çalışamaz');
       return;
     }
+    console.log('✅ Coach data cache\'den alındı');
     
     const coach = await coachData.json();
-    if (!coach.id) return;
+    console.log('👤 Coach:', coach.fullName, '- ID:', coach.id);
+    
+    if (!coach.id) {
+      console.log('❌ Coach ID yok!');
+      return;
+    }
     
     // Get Supabase credentials from cache
     const credentialsResponse = await cache.match('/supabase-credentials');
     if (!credentialsResponse) {
-      console.log('❌ Supabase credentials bulunamadı');
+      console.log('❌ Supabase credentials cache\'de YOK');
       return;
     }
+    console.log('✅ Credentials cache\'den alındı');
     
     const credentials = await credentialsResponse.json();
+    console.log('🔑 Supabase bağlantı bilgileri hazır');
     
     // Direct Supabase API call for background notifications
-    const response = await fetch(`${credentials.url}/rest/v1/notifications?coach_id=eq.${coach.id}&is_read=eq.false&order=created_at.desc`, {
+    const apiUrl = `${credentials.url}/rest/v1/notifications?coach_id=eq.${coach.id}&is_read=eq.false&order=created_at.desc`;
+    console.log('🌐 API çağrısı yapılıyor:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -55,23 +69,37 @@ async function checkForNewNotifications() {
       }
     });
     
+    console.log('📡 API yanıt durumu:', response.status, response.statusText);
+    
     if (!response.ok) {
-      console.log('❌ Failed to fetch notifications');
+      console.log('❌ API çağrısı başarısız!');
       return;
     }
     
     const notifications = await response.json();
+    console.log(`📬 API\'den ${notifications.length} okunmamış bildirim geldi`);
     
     // Show notifications that aren't shown yet
     const lastCheck = await getLastNotificationCheck();
+    console.log('⏰ Son check zamanı:', lastCheck);
+    
     const newNotifications = notifications.filter(n => 
       new Date(n.created_at) > new Date(lastCheck)
     );
     
-    console.log(`🔔 ${newNotifications.length} yeni bildirim bulundu`);
+    console.log(`🆕 ${newNotifications.length} YENI bildirim bulundu (toplam ${notifications.length} okunmamış)`);
+    
+    if (newNotifications.length === 0) {
+      console.log('✓ Yeni bildirim yok');
+      const elapsedTime = Date.now() - startTime;
+      console.log(`✅ Check tamamlandı (${elapsedTime}ms)`);
+      return;
+    }
     
     // Show each new notification
+    console.log('🔔 Bildirimler gösteriliyor...');
     for (const notification of newNotifications) {
+      console.log(`  📨 Bildirim: "${notification.title}" (ID: ${notification.id})`);
       await self.registration.showNotification(notification.title, {
         body: notification.message,
         icon: '/favicon.ico',
@@ -100,11 +128,17 @@ async function checkForNewNotifications() {
     }
     
     // Update last check time
-    await setLastNotificationCheck(new Date().toISOString());
-    console.log('✅ Background notification check tamamlandı');
+    const now = new Date().toISOString();
+    await setLastNotificationCheck(now);
+    console.log('⏰ Son check zamanı güncellendi:', now);
+    
+    const elapsedTime = Date.now() - startTime;
+    console.log(`✅ ===== BACKGROUND CHECK TAMAMLANDI (${elapsedTime}ms) =====`);
     
   } catch (error) {
-    console.error('❌ Background notification check hatası:', error);
+    console.error('❌ ===== BACKGROUND CHECK HATASI =====');
+    console.error('Hata:', error);
+    console.error('Stack:', error.stack);
   }
 }
 
@@ -171,20 +205,33 @@ self.addEventListener('message', function(event) {
   // Store coach data for background sync
   if (event.data && event.data.type === 'STORE_COACH_DATA') {
     const coachData = event.data.coach;
+    console.log('👤 COACH DATA ALINDI:', coachData.fullName, '- ID:', coachData.id);
     caches.open('coach-cache').then(cache => {
-      cache.put('/coach-data', new Response(JSON.stringify(coachData)));
-      console.log('💾 Coach data stored for background sync');
+      return cache.put('/coach-data', new Response(JSON.stringify(coachData)));
+    }).then(() => {
+      console.log('✅ Coach data CACHE\'e YAZILDI!');
+    }).catch(error => {
+      console.error('❌ Coach data cache hatası:', error);
     });
   }
   
   // Store Supabase credentials for background API calls
   if (event.data && event.data.type === 'STORE_SUPABASE_CREDENTIALS') {
     const credentials = event.data.credentials;
+    console.log('🔑 CREDENTIALS ALINDI! Background sync başlatılıyor...');
+    console.log('📍 Supabase URL:', credentials.url ? '✓ VAR' : '✗ YOK');
+    console.log('🔐 Anon Key:', credentials.anonKey ? '✓ VAR' : '✗ YOK');
+    
     caches.open('coach-cache').then(cache => {
-      cache.put('/supabase-credentials', new Response(JSON.stringify(credentials)));
-      console.log('🔑 Supabase credentials stored for background sync');
+      return cache.put('/supabase-credentials', new Response(JSON.stringify(credentials)));
+    }).then(() => {
+      console.log('� Credentials CACHE\'e YAZILDI!');
+      console.log('🚀 BACKGROUND CHECK BAŞLATILIYOR...');
       // Start background checking when credentials are available
       startBackgroundNotificationCheck();
+      console.log('✅ Background check timer KURULDU!');
+    }).catch(error => {
+      console.error('❌ Credentials cache hatası:', error);
     });
   }
   
@@ -195,33 +242,42 @@ self.addEventListener('message', function(event) {
   }
 });
 
-// Background notification checking timer
-let backgroundTimer;
+// Background notification checking timer - AGGRESSIVE MODE
+let backgroundTimer = null;
 let isAppVisible = true;
 
 function startBackgroundNotificationCheck() {
+  // Clear any existing timer
   if (backgroundTimer) {
     clearInterval(backgroundTimer);
+    backgroundTimer = null;
   }
   
-  console.log('⏰ Starting background notification check every 30 seconds');
+  console.log('🚀 AGGRESSIVE MODE: Background notification check BAŞLATILIYOR!');
   
-  // Check immediately
-  checkForNewNotifications();
+  // Check immediately when starting
+  checkForNewNotifications().then(() => {
+    console.log('✅ İlk background check tamamlandı');
+  }).catch(err => {
+    console.error('❌ İlk check hatası:', err);
+  });
   
-  // Android optimized: Check every 10 seconds
+  // Android ULTRA AGGRESSIVE: Check every 5 seconds ALWAYS
   backgroundTimer = setInterval(() => {
-    const checkInterval = isAppVisible ? 10000 : 5000; // 5 seconds when hidden
-    console.log(`🤖 Android Background check (app ${isAppVisible ? 'visible' : 'hidden'})`);
-    checkForNewNotifications();
-  }, 10000); // Check every 10 seconds for Android
+    console.log(`🤖 AGGRESSIVE CHECK (Sayfa: ${isAppVisible ? 'AÇIK ✓' : 'KAPALI ✗'})`);
+    checkForNewNotifications().catch(err => {
+      console.error('❌ Background check hatası:', err);
+    });
+  }, 5000); // 5 saniye - ULTRA AGGRESSIVE
+  
+  console.log('⏰ Background timer KURULDU - Her 5 saniyede bir check!');
 }
 
 function stopBackgroundNotificationCheck() {
   if (backgroundTimer) {
     clearInterval(backgroundTimer);
     backgroundTimer = null;
-    console.log('⏹️ Background notification check stopped');
+    console.log('⏹️ Background notification check DURDURULDU');
   }
 }
 
@@ -231,10 +287,21 @@ self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
 
-// Activate event
+// Activate event - START BACKGROUND CHECKING IMMEDIATELY
 self.addEventListener('activate', function(event) {
-  console.log('🚀 Service Worker activated');
-  event.waitUntil(clients.claim());
+  console.log('🚀 Service Worker ACTIVATED - Background checking başlatılıyor!');
+  event.waitUntil(
+    clients.claim().then(() => {
+      console.log('✅ Clients claimed - Background check başlıyor...');
+      // Start checking immediately when Service Worker activates
+      setTimeout(() => {
+        console.log('⏰ Activation sonrası ilk background check...');
+        checkForNewNotifications().catch(err => {
+          console.log('⚠️ İlk check için credentials henüz yok (normal):', err);
+        });
+      }, 2000); // 2 saniye sonra başla (credentials yüklensin diye)
+    })
+  );
 });
 
 self.addEventListener('notificationclick', function(event) {
