@@ -117,6 +117,7 @@ const StudentDetailPage: React.FC = () => {
     }
   };
 
+<<<<<<< HEAD
   // Helper function to convert Date to YYYY-MM-DD format without timezone issues
   const formatDateToLocal = (date: Date | string): string => {
     if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -129,21 +130,48 @@ const StudentDetailPage: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
+=======
+>>>>>>> 7cfbadfe11012fa881f1acbbbfac63d667a9d241
   const getHomeworkDates = () => {
     return homework.map(hw => hw.date);
   };
 
   // Daily log analysis functions
   const getDailyLogDates = () => {
+<<<<<<< HEAD
     return dailyLogs.map(log => formatDateToLocal(log.date));
+=======
+    // Ensure consistent date format
+    return dailyLogs.map(log => {
+      // If log.date is already in YYYY-MM-DD format, use it directly
+      if (typeof log.date === 'string' && log.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return log.date;
+      }
+      // Otherwise convert to consistent format
+      return new Date(log.date).toISOString().split('T')[0];
+    });
+>>>>>>> 7cfbadfe11012fa881f1acbbbfac63d667a9d241
   };
 
   const getSelectedDateLogs = () => {
     if (!selectedDate) return [];
+<<<<<<< HEAD
     const dateStr = formatDateToLocal(selectedDate);
     
     return dailyLogs.filter(log => {
       const logDateStr = formatDateToLocal(log.date);
+=======
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    
+    return dailyLogs.filter(log => {
+      // Normalize log date to YYYY-MM-DD format
+      let logDateStr;
+      if (typeof log.date === 'string' && log.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        logDateStr = log.date;
+      } else {
+        logDateStr = new Date(log.date).toISOString().split('T')[0];
+      }
+>>>>>>> 7cfbadfe11012fa881f1acbbbfac63d667a9d241
       return logDateStr === dateStr;
     });
   };
