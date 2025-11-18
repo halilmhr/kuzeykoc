@@ -1,0 +1,5 @@
+{
+  "name": "LGS Student Coaching Platform",
+  "description": "A comprehensive platform for LGS student coaching, connecting coaches and students. Coaches can manage students, assign tasks, and track progress. Students can log their daily work, view assignments, and see their performance reports.",
+  "requestFramePermissions": []
+}
