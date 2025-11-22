@@ -85,7 +85,7 @@ const StudentDetailPage: React.FC = () => {
   // Homework functions
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateToLocal(date);
     const dayHomework = homework.filter(hw => hw.date === dateStr);
     setSelectedDateHomework(dayHomework);
   };
@@ -93,19 +93,29 @@ const StudentDetailPage: React.FC = () => {
   const handleSaveHomework = async (newHomework: Omit<Homework, 'id' | 'createdAt'>) => {
     if (!auth?.user || !studentId) return;
     
+    console.log('Ödev kaydediliyor:', newHomework);
+    
     const homeworkData = {
       ...newHomework,
       studentId,
       coachId: auth.user.id
     };
 
-    const savedHomework = await supabaseApi.addHomework(homeworkData);
-    if (savedHomework) {
-      setHomework(prev => [...prev, savedHomework].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      // Update selected date homework if it's the same date
-      if (selectedDate && selectedDate.toISOString().split('T')[0] === savedHomework.date) {
-        setSelectedDateHomework(prev => [...prev, savedHomework]);
+    try {
+      const savedHomework = await supabaseApi.addHomework(homeworkData);
+      console.log('Ödev kaydedildi:', savedHomework);
+      
+      if (savedHomework) {
+        setHomework(prev => [...prev, savedHomework].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        // Update selected date homework if it's the same date
+        if (selectedDate && formatDateToLocal(selectedDate) === savedHomework.date) {
+          setSelectedDateHomework(prev => [...prev, savedHomework]);
+        }
+        alert('Ödev başarıyla eklendi!');
       }
+    } catch (error) {
+      console.error('Ödev kaydetme hatası:', error);
+      alert('Ödev kaydedilemedi: ' + error);
     }
   };
 

@@ -418,7 +418,12 @@ const CoachDashboard: React.FC = () => {
   };
 
   const handleSaveHomework = async (newHomework: Omit<Homework, 'id' | 'createdAt'>) => {
-    if (!auth?.user || !selectedStudent) return;
+    if (!auth?.user || !selectedStudent) {
+      console.error('Auth veya selectedStudent yok:', { auth: auth?.user, selectedStudent });
+      return;
+    }
+    
+    console.log('Ödev kaydediliyor:', newHomework);
     
     const homeworkData = {
       ...newHomework,
@@ -426,13 +431,21 @@ const CoachDashboard: React.FC = () => {
       coachId: auth.user.id
     };
 
-    const savedHomework = await supabaseApi.addHomework(homeworkData);
-    if (savedHomework) {
-      setHomework(prev => [...prev, savedHomework]);
-      // Update selected date homework if it's the same date
-      if (selectedDate && formatDateToLocal(selectedDate) === savedHomework.date) {
-        setSelectedDateHomework(prev => [...prev, savedHomework]);
+    try {
+      const savedHomework = await supabaseApi.addHomework(homeworkData);
+      console.log('Ödev kaydedildi:', savedHomework);
+      
+      if (savedHomework) {
+        setHomework(prev => [...prev, savedHomework]);
+        // Update selected date homework if it's the same date
+        if (selectedDate && formatDateToLocal(selectedDate) === savedHomework.date) {
+          setSelectedDateHomework(prev => [...prev, savedHomework]);
+        }
+        alert('Ödev başarıyla eklendi!');
       }
+    } catch (error) {
+      console.error('Ödev kaydetme hatası:', error);
+      alert('Ödev kaydedilemedi: ' + error);
     }
   };
 
